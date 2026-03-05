@@ -24,7 +24,11 @@ Every route returns a consistent, predictable response shape — making your API
 - **Auto-generated CRUD routes** from your Prisma schema
 - **Consistent response shape** across all endpoints
 - **Built-in pagination, search, sorting, and filtering** on all `GET` list endpoints
+- **Soft delete support** — automatic soft delete for models with `deletedAt` field
+- **Nested relations** — include related models via `?include=` query parameter
+- **TypeScript generics** — fully typed responses out of the box
 - **Fully customizable** — disable routes, add middleware, change prefixes per model
+- **Custom routes** — add your own routes on top of generated ones
 - **TypeScript first** — full type safety and intellisense out of the box
 - **Fastify powered** — fast and lightweight HTTP layer
 
@@ -272,21 +276,132 @@ app.addRoutes((fastify) => {
 
 ---
 
+## Soft Delete
+
+Models with a `deletedAt DateTime?` field automatically use soft delete — records are never permanently deleted, just marked with a timestamp.
+
+**Add `deletedAt` to your Prisma model:**
+
+```prisma
+model User {
+  id        Int       @id @default(autoincrement())
+  name      String
+  email     String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+}
+```
+
+**Auto-generated soft delete routes:**
+
+| Method | Route                    | Action                        |
+| ------ | ------------------------ | ----------------------------- |
+| DELETE | `/api/users/:id`         | Soft delete (sets deletedAt)  |
+| GET    | `/api/users/deleted`     | Find all soft deleted records |
+| PATCH  | `/api/users/:id/restore` | Restore a soft deleted record |
+
+Soft deleted records are automatically excluded from all `GET` list and `findById` queries.
+
+**Enable soft delete routes in config:**
+
+```ts
+const app = new ApiForm(prisma, {
+  models: {
+    user: {
+      findDeleted: { enabled: true },
+      restore: { enabled: true },
+    },
+  },
+});
+```
+
+**Custom soft delete field name:**
+
+```ts
+const app = new ApiForm(prisma, {
+  models: {
+    user: {
+      softDelete: "deleted_at", // use custom field name
+    },
+  },
+});
+```
+
+### ⚠️ Soft Delete & Relations
+
+apiform does not prevent linking records to soft deleted related records. It is the developer's responsibility to ensure relation integrity via custom middleware, application-level validation, or Prisma's referential actions.
+
+---
+
+## TypeScript Generics
+
+All CRUD operations support TypeScript generics for fully typed responses:
+
+```ts
+import type { User } from "@prisma/client";
+
+const result = await crud.findById<User>("user", 1);
+result.data.email; // ✅ typed as string
+result.data.name; // ✅ typed as string
+
+const list = await crud.findAll<User>("user", {});
+list.data; // ✅ typed as User[]
+```
+
+---
+
+## Nested Relations
+
+Include related models in your queries using the `?include=` query parameter:
+
+```
+GET /api/posts?include=author
+GET /api/users/1?include=posts
+GET /api/posts?include=author,comments
+```
+
+**Example response with included relation:**
+
+```json
+{
+  "success": true,
+  "message": "POSTS_RETRIEVED_SUCCESSFULLY",
+  "data": [
+    {
+      "id": 1,
+      "title": "Hello World",
+      "author": {
+        "id": 1,
+        "name": "John Doe"
+      }
+    }
+  ],
+  "meta": { ... },
+  "error": null
+}
+```
+
+---
+
 ## Configuration Reference
 
 ```ts
 new ApiForm(prismaClient, {
-  globalPrefix?: string;        // default: "/api"
-  globalMiddleware?: Function[]; // runs before every route
-  schemaPath?: string;          // custom path to schema.prisma
+  globalPrefix?: string;         // default: "/api"
+  globalMiddleware?: Function[];  // runs before every route
+  schemaPath?: string;           // custom path to schema.prisma
   models?: {
     [modelName]: boolean | {
       prefix?: string;
+      softDelete?: boolean | string; // true = use deletedAt, string = custom field name
       create?: RouteOptions;
       findAll?: RouteOptions;
       findById?: RouteOptions;
       update?: RouteOptions;
       delete?: RouteOptions;
+      restore?: RouteOptions;
+      findDeleted?: RouteOptions;
     }
   }
 });

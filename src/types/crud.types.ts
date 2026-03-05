@@ -10,10 +10,12 @@ export interface FindAllOptions {
   sortBy?: string;
   sortOrder?: "asc" | "desc";
   filters?: Record<string, unknown>;
+  include?: Record<string, boolean>;
 }
 
 export interface FindOneOptions {
   where: Record<string, unknown>;
+  include?: Record<string, boolean>;
 }
 
 export interface CreateOptions<T = Record<string, unknown>> {

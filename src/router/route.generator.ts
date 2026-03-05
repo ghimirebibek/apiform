@@ -68,6 +68,13 @@ export class RouteGenerator {
             if (!canProceed) return;
 
             const query = request.query as Record<string, string>;
+
+            const includeParam = query.include
+              ? Object.fromEntries(
+                  query.include.split(",").map((r: string) => [r.trim(), true])
+                )
+              : undefined;
+
             const result = await this.engine.findAll(modelName, {
               page: query.page ? parseInt(query.page) : 1,
               limit: query.limit ? parseInt(query.limit) : 10,
@@ -76,6 +83,7 @@ export class RouteGenerator {
               sortBy: query.sortBy,
               sortOrder: query.sortOrder as "asc" | "desc" | undefined,
               filters: query.filters ? JSON.parse(query.filters) : {},
+              include: includeParam,
             });
             reply.send(result);
           }
@@ -141,7 +149,18 @@ export class RouteGenerator {
             if (!canProceed) return;
 
             const { id } = request.params as { id: string };
-            const result = await this.engine.findById(modelName, id);
+            const query = request.query as Record<string, string>;
+            const includeParam = query.include
+              ? Object.fromEntries(
+                  query.include.split(",").map((r: string) => [r.trim(), true])
+                )
+              : undefined;
+
+            const result = await this.engine.findById(
+              modelName,
+              id,
+              includeParam
+            );
             reply.send(result);
           }
         );

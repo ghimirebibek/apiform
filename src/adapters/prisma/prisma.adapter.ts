@@ -72,6 +72,7 @@ export class PrismaAdapter extends BaseAdapter {
       searchBy,
       searchValue,
       filters = {},
+      include,
     } = options;
 
     const offset = (page - 1) * limit;
@@ -81,7 +82,6 @@ export class PrismaAdapter extends BaseAdapter {
       whereClause[searchBy] = { contains: searchValue, mode: "insensitive" };
     }
 
-    // Exclude soft deleted records
     const deletedAtField = this.getDeletedAtField(model);
     if (deletedAtField) {
       whereClause = SoftDeleteManager.excludeDeleted(
@@ -97,6 +97,7 @@ export class PrismaAdapter extends BaseAdapter {
         orderBy: { [sortBy]: sortOrder },
         skip: offset,
         take: limit,
+        ...(include ? { include } : {}),
       }),
       delegate.count({ where: whereClause }),
     ]);
@@ -130,7 +131,10 @@ export class PrismaAdapter extends BaseAdapter {
     }
 
     const delegate = this.getDelegate(model);
-    const data = await delegate.findFirst({ where: whereClause });
+    const data = await delegate.findFirst({
+      where: whereClause,
+      ...(options.include ? { include: options.include } : {}),
+    });
     return { data };
   }
 
@@ -141,7 +145,9 @@ export class PrismaAdapter extends BaseAdapter {
     const delegate = this.getDelegate(model);
     const parsedId =
       typeof id === "string" && !isNaN(Number(id)) ? Number(id) : id;
-    const data = await delegate.findUnique({ where: { id: parsedId } });
+    const data = await delegate.findUnique({
+      where: { id: parsedId },
+    });
     return { data };
   }
 

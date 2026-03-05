@@ -26,7 +26,8 @@ export abstract class BaseAdapter {
 
   abstract findById(
     model: string,
-    id: string | number
+    id: string | number,
+    include?: Record<string, boolean>
   ): Promise<CrudResult<unknown>>;
 
   abstract create(

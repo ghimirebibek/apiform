@@ -64,10 +64,11 @@ export class CrudEngine {
 
   async findById<T = unknown>(
     model: string,
-    id: string | number
+    id: string | number,
+    include?: Record<string, boolean>
   ): Promise<ApiResponse<T>> {
     try {
-      const result = await this.adapter.findById(model, id);
+      const result = await this.adapter.findById(model, id, include);
 
       if (!result.data) {
         return ResponseFormatter.error(
