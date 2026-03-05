@@ -4,6 +4,7 @@ import { RouteConfig } from "./route.config";
 import { MiddlewareBinder } from "./middleware.binder";
 import type { PrismaAdapter } from "../adapters/prisma/prisma.adapter";
 import type { ApiFormConfig } from "../types/config.types";
+import { ErrorHandler } from "../core/error.handler";
 
 export class RouteGenerator {
   private engine: CrudEngine;
@@ -26,6 +27,15 @@ export class RouteGenerator {
       }
     }
     this.adapter.setModelConfigs(modelConfigs);
+  }
+
+  private send(reply: FastifyReply, result: any): void {
+    if (result.success === false && result.error?.code) {
+      const status = ErrorHandler.getHttpStatus(result.error.code);
+      reply.status(status).send(result);
+    } else {
+      reply.send(result);
+    }
   }
 
   applyModelConfigs(): void {
@@ -85,7 +95,7 @@ export class RouteGenerator {
               filters: query.filters ? JSON.parse(query.filters) : {},
               include: includeParam,
             });
-            reply.send(result);
+            this.send(reply, result);
           }
         );
       }
@@ -161,7 +171,7 @@ export class RouteGenerator {
               id,
               includeParam
             );
-            reply.send(result);
+            this.send(reply, result);
           }
         );
       }
@@ -185,7 +195,11 @@ export class RouteGenerator {
             const result = await this.engine.create(modelName, {
               data: request.body as Record<string, unknown>,
             });
-            reply.status(201).send(result);
+            if (result.success === false) {
+              this.send(reply, result);
+            } else {
+              reply.status(201).send(result);
+            }
           }
         );
       }
@@ -211,7 +225,7 @@ export class RouteGenerator {
               where: { id },
               data: request.body as Record<string, unknown>,
             });
-            reply.send(result);
+            this.send(reply, result);
           }
         );
       }
@@ -236,7 +250,7 @@ export class RouteGenerator {
             const result = await this.engine.delete(modelName, {
               where: { id },
             });
-            reply.send(result);
+            this.send(reply, result);
           }
         );
       }

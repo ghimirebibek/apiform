@@ -13,6 +13,12 @@
 - Better TypeScript generics — all CRUD operations now support typed responses e.g. `crud.findById<User>("user", 1)`
 - Nested/related models support via `?include=relation1,relation2` query parameter on all GET endpoints
 
+### Fixed
+
+- Correct HTTP status codes on error responses (404, 409, 400, 500)
+- Input validation on create and update routes using Zod
+- Bundle size reduced from 1.71MB to 27KB by externalizing Fastify, Zod and Prisma dependencies
+
 ## [0.1.0] - 2026-03-05
 
 ### Added

@@ -10,6 +10,7 @@ import type {
   UpdateOptions,
   DeleteOptions,
 } from "../types/crud.types";
+import { Validator } from "./validator";
 
 export class CrudEngine {
   private adapter: BaseAdapter;
@@ -91,8 +92,23 @@ export class CrudEngine {
     options: CreateOptions
   ): Promise<ApiResponse<T>> {
     try {
-      const result = await this.adapter.create(model, options);
+      const modelDef = this.adapter.getModel(model);
+      if (modelDef) {
+        const writableFields = modelDef.fields.filter(
+          (f) =>
+            !f.isId &&
+            f.name !== "createdAt" &&
+            f.name !== "updatedAt" &&
+            f.name !== "deletedAt"
+        );
+        const schema = Validator.buildSchema(writableFields);
+        const validation = Validator.validate(schema, options.data);
+        if (!validation.success) {
+          return validation.error as any;
+        }
+      }
 
+      const result = await this.adapter.create(model, options);
       return ResponseFormatter.success<T>(
         result.data as T,
         ResponseFormatter.formatMessage("create", model)
@@ -107,8 +123,25 @@ export class CrudEngine {
     options: UpdateOptions
   ): Promise<ApiResponse<T>> {
     try {
-      const result = await this.adapter.update(model, options);
+      const modelDef = this.adapter.getModel(model);
+      if (modelDef) {
+        const writableFields = modelDef.fields
+          .filter(
+            (f) =>
+              !f.isId &&
+              f.name !== "createdAt" &&
+              f.name !== "updatedAt" &&
+              f.name !== "deletedAt"
+          )
+          .map((f) => ({ ...f, isRequired: false })); // all fields optional on update
+        const schema = Validator.buildSchema(writableFields);
+        const validation = Validator.validate(schema, options.data);
+        if (!validation.success) {
+          return validation.error as any;
+        }
+      }
 
+      const result = await this.adapter.update(model, options);
       return ResponseFormatter.success<T>(
         result.data as T,
         ResponseFormatter.formatMessage("update", model)

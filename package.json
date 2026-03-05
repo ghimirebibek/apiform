@@ -12,7 +12,7 @@
     }
   },
   "scripts": {
-    "build": "bun build ./src/index.ts --outdir ./dist --target node && bunx tsc",
+    "build": "bun build ./src/index.ts --outdir ./dist --target node --external fastify --external zod --external @prisma/client && bunx tsc",
     "dev": "bun run ./src/index.ts"
   },
   "files": [

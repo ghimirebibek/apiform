@@ -30,6 +30,19 @@ export class ErrorHandler {
     );
   }
 
+  static getHttpStatus(code: ErrorCode): number {
+    const statusMap: Record<ErrorCode, number> = {
+      [ErrorCode.VALIDATION_ERROR]: 400,
+      [ErrorCode.BAD_REQUEST]: 400,
+      [ErrorCode.UNAUTHORIZED]: 401,
+      [ErrorCode.FORBIDDEN]: 403,
+      [ErrorCode.NOT_FOUND]: 404,
+      [ErrorCode.CONFLICT]: 409,
+      [ErrorCode.INTERNAL_ERROR]: 500,
+    };
+    return statusMap[code] ?? 500;
+  }
+
   private static handlePrismaError(error: PrismaError): ErrorResponse {
     switch (error.code) {
       case "P2002":
