@@ -1,6 +1,7 @@
 import type { BaseAdapter } from "../adapters/base.adapter";
 import { ResponseFormatter } from "./response.formatter";
 import { ErrorHandler } from "./error.handler";
+import { ErrorCode } from "../types/response.types";
 import type { ApiResponse } from "../types/response.types";
 import type {
   FindAllOptions,
@@ -17,17 +18,17 @@ export class CrudEngine {
     this.adapter = adapter;
   }
 
-  async findAll(
+  async findAll<T = unknown>(
     model: string,
     options: FindAllOptions = {}
-  ): Promise<ApiResponse<unknown[]>> {
+  ): Promise<ApiResponse<T[]>> {
     try {
       const result = await this.adapter.findAll(model, options);
       const page = options.page ?? 1;
       const limit = options.limit ?? 10;
 
-      return ResponseFormatter.paginate(
-        result.data ?? [],
+      return ResponseFormatter.paginate<T>(
+        (result.data ?? []) as T[],
         model,
         page,
         limit,
@@ -38,22 +39,22 @@ export class CrudEngine {
     }
   }
 
-  async findOne(
+  async findOne<T = unknown>(
     model: string,
     options: FindOneOptions
-  ): Promise<ApiResponse<unknown>> {
+  ): Promise<ApiResponse<T>> {
     try {
       const result = await this.adapter.findOne(model, options);
 
       if (!result.data) {
         return ResponseFormatter.error(
           `${model.toUpperCase()}_NOT_FOUND`,
-          "NOT_FOUND" as any
+          ErrorCode.NOT_FOUND
         );
       }
 
-      return ResponseFormatter.success(
-        result.data,
+      return ResponseFormatter.success<T>(
+        result.data as T,
         ResponseFormatter.formatMessage("findById", model)
       );
     } catch (error) {
@@ -61,22 +62,22 @@ export class CrudEngine {
     }
   }
 
-  async findById(
+  async findById<T = unknown>(
     model: string,
     id: string | number
-  ): Promise<ApiResponse<unknown>> {
+  ): Promise<ApiResponse<T>> {
     try {
       const result = await this.adapter.findById(model, id);
 
       if (!result.data) {
         return ResponseFormatter.error(
           `${model.toUpperCase()}_NOT_FOUND`,
-          "NOT_FOUND" as any
+          ErrorCode.NOT_FOUND
         );
       }
 
-      return ResponseFormatter.success(
-        result.data,
+      return ResponseFormatter.success<T>(
+        result.data as T,
         ResponseFormatter.formatMessage("findById", model)
       );
     } catch (error) {
@@ -84,15 +85,15 @@ export class CrudEngine {
     }
   }
 
-  async create(
+  async create<T = unknown>(
     model: string,
     options: CreateOptions
-  ): Promise<ApiResponse<unknown>> {
+  ): Promise<ApiResponse<T>> {
     try {
       const result = await this.adapter.create(model, options);
 
-      return ResponseFormatter.success(
-        result.data,
+      return ResponseFormatter.success<T>(
+        result.data as T,
         ResponseFormatter.formatMessage("create", model)
       );
     } catch (error) {
@@ -100,15 +101,15 @@ export class CrudEngine {
     }
   }
 
-  async update(
+  async update<T = unknown>(
     model: string,
     options: UpdateOptions
-  ): Promise<ApiResponse<unknown>> {
+  ): Promise<ApiResponse<T>> {
     try {
       const result = await this.adapter.update(model, options);
 
-      return ResponseFormatter.success(
-        result.data,
+      return ResponseFormatter.success<T>(
+        result.data as T,
         ResponseFormatter.formatMessage("update", model)
       );
     } catch (error) {
@@ -116,15 +117,15 @@ export class CrudEngine {
     }
   }
 
-  async delete(
+  async delete<T = unknown>(
     model: string,
     options: DeleteOptions
-  ): Promise<ApiResponse<unknown>> {
+  ): Promise<ApiResponse<T>> {
     try {
       const result = await this.adapter.delete(model, options);
 
-      return ResponseFormatter.success(
-        result.data,
+      return ResponseFormatter.success<T>(
+        result.data as T,
         ResponseFormatter.formatMessage("delete", model)
       );
     } catch (error) {

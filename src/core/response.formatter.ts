@@ -2,8 +2,8 @@ import type {
   SuccessResponse,
   ErrorResponse,
   PaginationMeta,
-  ErrorCode,
 } from "../types/response.types";
+import { ErrorCode } from "../types/response.types";
 
 export class ResponseFormatter {
   static success<T>(
@@ -55,7 +55,7 @@ export class ResponseFormatter {
     };
 
     const message = `${modelName.toUpperCase()}S_RETRIEVED_SUCCESSFULLY`;
-    return this.success(data, message, meta);
+    return this.success<T[]>(data, message, meta);
   }
 
   static formatMessage(action: string, modelName: string): string {

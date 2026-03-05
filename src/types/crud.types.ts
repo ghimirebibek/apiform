@@ -35,13 +35,10 @@ export interface CrudResult<T = unknown> {
 }
 
 export interface ICrudEngine {
-  findAll(
-    model: string,
-    options: FindAllOptions
-  ): Promise<CrudResult<unknown[]>>;
-  findOne(model: string, options: FindOneOptions): Promise<CrudResult<unknown>>;
-  findById(model: string, id: string | number): Promise<CrudResult<unknown>>;
-  create(model: string, options: CreateOptions): Promise<CrudResult<unknown>>;
-  update(model: string, options: UpdateOptions): Promise<CrudResult<unknown>>;
-  delete(model: string, options: DeleteOptions): Promise<CrudResult<unknown>>;
+  findAll<T>(model: string, options: FindAllOptions): Promise<CrudResult<T[]>>;
+  findOne<T>(model: string, options: FindOneOptions): Promise<CrudResult<T>>;
+  findById<T>(model: string, id: string | number): Promise<CrudResult<T>>;
+  create<T>(model: string, options: CreateOptions): Promise<CrudResult<T>>;
+  update<T>(model: string, options: UpdateOptions): Promise<CrudResult<T>>;
+  delete<T>(model: string, options: DeleteOptions): Promise<CrudResult<T>>;
 }
