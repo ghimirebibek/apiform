@@ -1,0 +1,57 @@
+{
+  "name": "apiform",
+  "version": "0.0.1",
+  "description": "Auto-generate CRUD routes from your Prisma schema",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "bun build ./src/index.ts --outdir ./dist --target node && bunx tsc",
+    "dev": "bun run ./src/index.ts"
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "prisma",
+    "crud",
+    "rest",
+    "api",
+    "fastify",
+    "auto-generate",
+    "routes",
+    "typescript"
+  ],
+  "license": "MIT",
+  "author": {
+    "name": "Bibek Ghimire",
+    "url": "https://github.com/ghimirebibek"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ghimirebibek/apiform.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ghimirebibek/apiform/issues"
+  },
+  "homepage": "https://github.com/ghimirebibek/apiform#readme",
+  "peerDependencies": {
+    "@prisma/client": ">=7.0.0",
+    "typescript": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "^25.3.3",
+    "prisma": "^7.4.2"
+  },
+  "dependencies": {
+    "fastify": "^5.8.1",
+    "zod": "^4.3.6"
+  }
+}
