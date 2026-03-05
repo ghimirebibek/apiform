@@ -1,8 +1,4 @@
-import Fastify, {
-  type FastifyInstance,
-  type FastifyRequest,
-  type FastifyReply,
-} from "fastify";
+import Fastify, { type FastifyInstance } from "fastify";
 import { PrismaAdapter } from "./adapters/prisma/prisma.adapter";
 import { RouteGenerator } from "./router/route.generator";
 import type { ApiFormConfig } from "./types/config.types";
@@ -21,7 +17,6 @@ export class ApiForm {
     this.generator = new RouteGenerator(this.adapter, config);
   }
 
-  // Register custom routes — runs after apiform routes
   addRoutes(handler: CustomRouteHandler): this {
     this.customRoutes.push(handler);
     return this;
@@ -29,11 +24,9 @@ export class ApiForm {
 
   async start(port: number = 3000): Promise<void> {
     await this.adapter.connect();
-
-    // Register apiform auto-generated routes first
+    this.generator.applyModelConfigs();
     await this.generator.register(this.fastify);
 
-    // Then register custom routes on top
     for (const handler of this.customRoutes) {
       await handler(this.fastify);
     }
@@ -51,11 +44,13 @@ export class ApiForm {
   }
 }
 
+// Exports
 export { PrismaAdapter } from "./adapters/prisma/prisma.adapter";
 export { RouteGenerator } from "./router/route.generator";
 export { CrudEngine } from "./core/crud.engine";
 export { ResponseFormatter } from "./core/response.formatter";
 export { ErrorHandler } from "./core/error.handler";
+export { SoftDeleteManager } from "./core/soft-delete.manager";
 export type {
   ApiFormConfig,
   ModelRouteConfig,

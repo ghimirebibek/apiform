@@ -2,18 +2,42 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { CrudEngine } from "../core/crud.engine";
 import { RouteConfig } from "./route.config";
 import { MiddlewareBinder } from "./middleware.binder";
-import type { BaseAdapter } from "../adapters/base.adapter";
+import type { PrismaAdapter } from "../adapters/prisma/prisma.adapter";
 import type { ApiFormConfig } from "../types/config.types";
 
 export class RouteGenerator {
   private engine: CrudEngine;
   private config: RouteConfig;
-  private adapter: BaseAdapter;
+  private adapter: PrismaAdapter;
+  private rawConfig: ApiFormConfig;
 
-  constructor(adapter: BaseAdapter, config: ApiFormConfig = {}) {
+  constructor(adapter: PrismaAdapter, config: ApiFormConfig = {}) {
     this.adapter = adapter;
     this.engine = new CrudEngine(adapter);
     this.config = new RouteConfig(config);
+    this.rawConfig = config;
+
+    const modelConfigs: Record<string, any> = {};
+    if (config.models) {
+      for (const [key, value] of Object.entries(config.models)) {
+        if (typeof value === "object" && value !== null) {
+          modelConfigs[key] = value;
+        }
+      }
+    }
+    this.adapter.setModelConfigs(modelConfigs);
+  }
+
+  applyModelConfigs(): void {
+    const modelConfigs: Record<string, any> = {};
+    if (this.rawConfig.models) {
+      for (const [key, value] of Object.entries(this.rawConfig.models)) {
+        if (typeof value === "object" && value !== null) {
+          modelConfigs[key] = value;
+        }
+      }
+    }
+    this.adapter.setModelConfigs(modelConfigs);
   }
 
   async register(fastify: FastifyInstance): Promise<void> {
@@ -22,7 +46,6 @@ export class RouteGenerator {
 
     for (const model of models) {
       const modelName = model.name;
-
       if (!this.config.isModelEnabled(modelName)) continue;
 
       const prefix = this.config.getModelPrefix(modelName);
@@ -54,8 +77,49 @@ export class RouteGenerator {
               sortOrder: query.sortOrder as "asc" | "desc" | undefined,
               filters: query.filters ? JSON.parse(query.filters) : {},
             });
-
             reply.send(result);
+          }
+        );
+      }
+
+      // GET /prefix/deleted — findDeleted
+      if (this.config.isRouteEnabled(modelName, "findDeleted")) {
+        const middlewares = MiddlewareBinder.bind(
+          globalMiddleware,
+          modelConfig.findDeleted
+        );
+        fastify.get(
+          `${prefix}/deleted`,
+          async (request: FastifyRequest, reply: FastifyReply) => {
+            const canProceed = await MiddlewareBinder.run(
+              middlewares,
+              request,
+              reply
+            );
+            if (!canProceed) return;
+
+            const query = request.query as Record<string, string>;
+            try {
+              const result = await this.adapter.findDeleted(modelName, {
+                page: query.page ? parseInt(query.page) : 1,
+                limit: query.limit ? parseInt(query.limit) : 10,
+              });
+              reply.send({
+                success: true,
+                message: `${modelName.toUpperCase()}S_DELETED_RETRIEVED_SUCCESSFULLY`,
+                data: result.data,
+                meta: result.meta,
+                error: null,
+              });
+            } catch {
+              reply.status(400).send({
+                success: false,
+                message: "SOFT_DELETE_NOT_SUPPORTED",
+                data: null,
+                meta: null,
+                error: { code: "BAD_REQUEST" },
+              });
+            }
           }
         );
       }
@@ -133,7 +197,7 @@ export class RouteGenerator {
         );
       }
 
-      // DELETE /prefix/:id — delete
+      // DELETE /prefix/:id — delete or soft delete
       if (this.config.isRouteEnabled(modelName, "delete")) {
         const middlewares = MiddlewareBinder.bind(
           globalMiddleware,
@@ -154,6 +218,45 @@ export class RouteGenerator {
               where: { id },
             });
             reply.send(result);
+          }
+        );
+      }
+
+      // PATCH /prefix/:id/restore — restore soft deleted record
+      if (this.config.isRouteEnabled(modelName, "restore")) {
+        const middlewares = MiddlewareBinder.bind(
+          globalMiddleware,
+          modelConfig.restore
+        );
+        fastify.patch(
+          `${prefix}/:id/restore`,
+          async (request: FastifyRequest, reply: FastifyReply) => {
+            const canProceed = await MiddlewareBinder.run(
+              middlewares,
+              request,
+              reply
+            );
+            if (!canProceed) return;
+
+            const { id } = request.params as { id: string };
+            try {
+              const result = await this.adapter.restore(modelName, id);
+              reply.send({
+                success: true,
+                message: `${modelName.toUpperCase()}_RESTORED_SUCCESSFULLY`,
+                data: result.data,
+                meta: null,
+                error: null,
+              });
+            } catch {
+              reply.status(400).send({
+                success: false,
+                message: "SOFT_DELETE_NOT_SUPPORTED",
+                data: null,
+                meta: null,
+                error: { code: "BAD_REQUEST" },
+              });
+            }
           }
         );
       }

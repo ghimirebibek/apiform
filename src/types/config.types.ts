@@ -17,7 +17,10 @@ export interface ModelRouteConfig {
   findById?: RouteOptions;
   update?: RouteOptions;
   delete?: RouteOptions;
+  restore?: RouteOptions;
+  findDeleted?: RouteOptions;
   prefix?: string;
+  softDelete?: boolean | string; // true = use deletedAt, string = custom field name
 }
 
 export interface ApiFormConfig {

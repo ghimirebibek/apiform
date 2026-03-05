@@ -45,7 +45,6 @@ export class SchemaReader {
       .split("\n")
       .map((l) => l.trim())
       .filter(Boolean);
-
     for (const line of lines) {
       // Skip directives and empty lines
       if (line.startsWith("@@") || line.startsWith("//")) continue;
