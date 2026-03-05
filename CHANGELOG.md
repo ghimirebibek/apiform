@@ -20,7 +20,7 @@
 - Initial release
 - Auto-generated CRUD routes from Prisma schema
 - Consistent response shape across all endpoints
-- Built-in pagination, search, sorting and filtering[text](chore:%20release%200.2.0)
+- Built-in pagination, search, sorting and filtering
 - Fully customizable routes and middleware
 - TypeScript first with full type safety
 - Fastify powered HTTP layer
