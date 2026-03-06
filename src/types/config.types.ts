@@ -5,15 +5,21 @@ export type MiddlewareFunction = (
   reply: FastifyReply,
 ) => Promise<void> | void;
 
+export interface RateLimitConfig {
+  max: number;
+  timeWindow: number;
+}
+
 export interface RouteOptions {
   enabled?: boolean;
   middleware?: MiddlewareFunction[];
   roles?: string[];
+  rateLimit?: RateLimitConfig;
 }
 
 export interface RbacConfig {
-  rolesPath?: string; // default: "user.roles"
-  globalRoles?: string[]; // roles required for all routes
+  rolesPath?: string;
+  globalRoles?: string[];
 }
 
 export interface ModelRouteConfig {
@@ -34,4 +40,5 @@ export interface ApiFormConfig {
   globalMiddleware?: MiddlewareFunction[];
   schemaPath?: string;
   rbac?: RbacConfig;
+  rateLimit?: RateLimitConfig;
 }

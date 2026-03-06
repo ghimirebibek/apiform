@@ -3,7 +3,7 @@ import { CrudEngine } from "../core/crud.engine";
 import { RouteConfig } from "./route.config";
 import { MiddlewareBinder } from "./middleware.binder";
 import type { PrismaAdapter } from "../adapters/prisma/prisma.adapter";
-import type { ApiFormConfig } from "../types/config.types";
+import type { ApiFormConfig, RouteOptions } from "../types/config.types";
 import { ErrorHandler } from "../core/error.handler";
 import { RbacManager } from "../core/rbac.manager";
 
@@ -41,6 +41,20 @@ export class RouteGenerator {
     }
   }
 
+  private buildRouteConfig(routeOptions?: RouteOptions): object {
+    if (routeOptions?.rateLimit) {
+      return {
+        config: {
+          rateLimit: {
+            max: routeOptions.rateLimit.max,
+            timeWindow: routeOptions.rateLimit.timeWindow * 1000,
+          },
+        },
+      };
+    }
+    return {};
+  }
+
   applyModelConfigs(): void {
     const modelConfigs: Record<string, any> = {};
     if (this.rawConfig.models) {
@@ -72,6 +86,7 @@ export class RouteGenerator {
         );
         fastify.get(
           prefix,
+          { ...this.buildRouteConfig(modelConfig.findAll) },
           async (request: FastifyRequest, reply: FastifyReply) => {
             const canProceed = await MiddlewareBinder.run(
               middlewares,
@@ -118,6 +133,7 @@ export class RouteGenerator {
         );
         fastify.get(
           `${prefix}/deleted`,
+          { ...this.buildRouteConfig(modelConfig.findDeleted) },
           async (request: FastifyRequest, reply: FastifyReply) => {
             const canProceed = await MiddlewareBinder.run(
               middlewares,
@@ -167,6 +183,7 @@ export class RouteGenerator {
         );
         fastify.get(
           `${prefix}/:id`,
+          { ...this.buildRouteConfig(modelConfig.findById) },
           async (request: FastifyRequest, reply: FastifyReply) => {
             const canProceed = await MiddlewareBinder.run(
               middlewares,
@@ -208,6 +225,7 @@ export class RouteGenerator {
         );
         fastify.post(
           prefix,
+          { ...this.buildRouteConfig(modelConfig.create) },
           async (request: FastifyRequest, reply: FastifyReply) => {
             const canProceed = await MiddlewareBinder.run(
               middlewares,
@@ -243,6 +261,7 @@ export class RouteGenerator {
         );
         fastify.patch(
           `${prefix}/:id`,
+          { ...this.buildRouteConfig(modelConfig.update) },
           async (request: FastifyRequest, reply: FastifyReply) => {
             const canProceed = await MiddlewareBinder.run(
               middlewares,
@@ -276,6 +295,7 @@ export class RouteGenerator {
         );
         fastify.delete(
           `${prefix}/:id`,
+          { ...this.buildRouteConfig(modelConfig.delete) },
           async (request: FastifyRequest, reply: FastifyReply) => {
             const canProceed = await MiddlewareBinder.run(
               middlewares,
@@ -308,6 +328,7 @@ export class RouteGenerator {
         );
         fastify.patch(
           `${prefix}/:id/restore`,
+          { ...this.buildRouteConfig(modelConfig.restore) },
           async (request: FastifyRequest, reply: FastifyReply) => {
             const canProceed = await MiddlewareBinder.run(
               middlewares,

@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.4.0] - 2026-03-06
+
+### Added
+
+- Rate limiting support via `@fastify/rate-limit`
+- Global rate limit via `rateLimit: { max, timeWindow }` in config
+- Per route rate limit override via `rateLimit` in route options
+- Returns custom `RATE_LIMIT_EXCEEDED` error response shape
+
 ## [0.3.0] - 2026-03-06
 
 ### Added

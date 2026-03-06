@@ -27,6 +27,8 @@ Every route returns a consistent, predictable response shape — making your API
 - **Soft delete support** — automatic soft delete for models with `deletedAt` field
 - **Nested relations** — include related models via `?include=` query parameter
 - **TypeScript generics** — fully typed responses out of the box
+- **Role-Based Access Control (RBAC)** — global and per-route role protection
+- **Rate limiting** — global and per-route rate limiting out of the box
 - **Fully customizable** — disable routes, add middleware, change prefixes per model
 - **Custom routes** — add your own routes on top of generated ones
 - **TypeScript first** — full type safety and intellisense out of the box
@@ -438,6 +440,62 @@ GET /api/posts?include=author,comments
 
 ---
 
+## Rate Limiting
+
+Protect your API from abuse with built-in rate limiting powered by `@fastify/rate-limit`.
+
+**Global rate limit:**
+
+```ts
+const app = new ApiForm(prisma, {
+  rateLimit: {
+    max: 100, // maximum requests
+    timeWindow: 60, // per 60 seconds
+  },
+  models: {
+    user: true,
+  },
+});
+```
+
+**Per route override:**
+
+```ts
+const app = new ApiForm(prisma, {
+  rateLimit: {
+    max: 100,
+    timeWindow: 60,
+  },
+  models: {
+    user: {
+      create: { rateLimit: { max: 10, timeWindow: 60 } }, // stricter on create
+    },
+  },
+});
+```
+
+**Response when rate limit is exceeded:**
+
+```json
+{
+  "success": false,
+  "message": "RATE_LIMIT_EXCEEDED",
+  "data": null,
+  "meta": null,
+  "error": {
+    "code": "TOO_MANY_REQUESTS"
+  }
+}
+```
+
+Rate limit headers are automatically included in every response:
+
+- `x-ratelimit-limit` — maximum requests allowed
+- `x-ratelimit-remaining` — requests remaining in current window
+- `x-ratelimit-reset` — seconds until the window resets
+
+---
+
 ## Configuration Reference
 
 ```ts
@@ -445,6 +503,10 @@ new ApiForm(prismaClient, {
   globalPrefix?: string;          // default: "/api"
   globalMiddleware?: Function[];   // runs before every route
   schemaPath?: string;            // custom path to schema.prisma
+  rateLimit?: {
+    max: number;                  // maximum requests
+    timeWindow: number;           // time window in seconds
+  };
   rbac?: {
     rolesPath?: string;           // default: "user.roles"
     globalRoles?: string[];       // roles required for all routes
@@ -452,7 +514,7 @@ new ApiForm(prismaClient, {
   models?: {
     [modelName]: boolean | {
       prefix?: string;
-      softDelete?: boolean | string; // true = use deletedAt, string = custom field name
+      softDelete?: boolean | string;
       create?: RouteOptions;
       findAll?: RouteOptions;
       findById?: RouteOptions;
@@ -469,6 +531,10 @@ new ApiForm(prismaClient, {
   enabled?: boolean;        // default: true
   middleware?: Function[];  // route-level middleware
   roles?: string[];         // roles required for this route
+  rateLimit?: {
+    max: number;            // override global rate limit
+    timeWindow: number;     // time window in seconds
+  };
 }
 ```
 

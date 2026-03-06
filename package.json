@@ -1,6 +1,6 @@
 {
   "name": "apiform",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Auto-generate CRUD routes from your Prisma schema",
   "type": "module",
   "main": "./dist/index.js",
@@ -12,8 +12,9 @@
     }
   },
   "scripts": {
-    "build": "bun build ./src/index.ts --outdir ./dist --target node --external fastify --external zod --external @prisma/client && bunx tsc",
-    "dev": "bun run ./src/index.ts"
+    "build": "bun build ./src/index.ts --outdir ./dist --target node --external fastify --external zod --external @prisma/client --external @fastify/rate-limit && bunx tsc",
+    "dev": "bun run ./src/index.ts",
+    "test": "bun test"
   },
   "files": [
     "dist"
@@ -51,6 +52,7 @@
     "prisma": "^7.4.2"
   },
   "dependencies": {
+    "@fastify/rate-limit": "^10.3.0",
     "fastify": "^5.8.1",
     "zod": "^4.3.6"
   }
