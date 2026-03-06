@@ -74,3 +74,5 @@ export type {
   ModelField,
   IAdapter,
 } from "./types/adapter.types";
+export { RbacManager } from "./core/rbac.manager";
+export type { RbacConfig } from "./types/config.types";

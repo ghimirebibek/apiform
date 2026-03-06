@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.0] - 2026-03-06
+
+### Added
+
+- Role-Based Access Control (RBAC) support
+- `rbac.rolesPath` — configurable path to roles on request (default: `user.roles`)
+- `rbac.globalRoles` — roles required for all routes
+- Per route role override via `roles: ["admin"]` in route options
+- Returns 403 FORBIDDEN when user lacks required role
+
 ## [0.2.0] - 2026-03-05
 
 ### Added

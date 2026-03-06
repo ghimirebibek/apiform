@@ -5,18 +5,21 @@ import { MiddlewareBinder } from "./middleware.binder";
 import type { PrismaAdapter } from "../adapters/prisma/prisma.adapter";
 import type { ApiFormConfig } from "../types/config.types";
 import { ErrorHandler } from "../core/error.handler";
+import { RbacManager } from "../core/rbac.manager";
 
 export class RouteGenerator {
   private engine: CrudEngine;
   private config: RouteConfig;
   private adapter: PrismaAdapter;
   private rawConfig: ApiFormConfig;
+  private rbac: RbacManager;
 
   constructor(adapter: PrismaAdapter, config: ApiFormConfig = {}) {
     this.adapter = adapter;
     this.engine = new CrudEngine(adapter);
     this.config = new RouteConfig(config);
     this.rawConfig = config;
+    this.rbac = new RbacManager(config.rbac);
 
     const modelConfigs: Record<string, any> = {};
     if (config.models) {
@@ -65,7 +68,7 @@ export class RouteGenerator {
       if (this.config.isRouteEnabled(modelName, "findAll")) {
         const middlewares = MiddlewareBinder.bind(
           globalMiddleware,
-          modelConfig.findAll
+          modelConfig.findAll,
         );
         fastify.get(
           prefix,
@@ -73,15 +76,22 @@ export class RouteGenerator {
             const canProceed = await MiddlewareBinder.run(
               middlewares,
               request,
-              reply
+              reply,
             );
             if (!canProceed) return;
+
+            const allowed = await this.rbac.checkAccess(
+              request,
+              reply,
+              modelConfig.findAll?.roles,
+            );
+            if (!allowed) return;
 
             const query = request.query as Record<string, string>;
 
             const includeParam = query.include
               ? Object.fromEntries(
-                  query.include.split(",").map((r: string) => [r.trim(), true])
+                  query.include.split(",").map((r: string) => [r.trim(), true]),
                 )
               : undefined;
 
@@ -96,7 +106,7 @@ export class RouteGenerator {
               include: includeParam,
             });
             this.send(reply, result);
-          }
+          },
         );
       }
 
@@ -104,7 +114,7 @@ export class RouteGenerator {
       if (this.config.isRouteEnabled(modelName, "findDeleted")) {
         const middlewares = MiddlewareBinder.bind(
           globalMiddleware,
-          modelConfig.findDeleted
+          modelConfig.findDeleted,
         );
         fastify.get(
           `${prefix}/deleted`,
@@ -112,9 +122,16 @@ export class RouteGenerator {
             const canProceed = await MiddlewareBinder.run(
               middlewares,
               request,
-              reply
+              reply,
             );
             if (!canProceed) return;
+
+            const allowed = await this.rbac.checkAccess(
+              request,
+              reply,
+              modelConfig.findDeleted?.roles,
+            );
+            if (!allowed) return;
 
             const query = request.query as Record<string, string>;
             try {
@@ -138,7 +155,7 @@ export class RouteGenerator {
                 error: { code: "BAD_REQUEST" },
               });
             }
-          }
+          },
         );
       }
 
@@ -146,7 +163,7 @@ export class RouteGenerator {
       if (this.config.isRouteEnabled(modelName, "findById")) {
         const middlewares = MiddlewareBinder.bind(
           globalMiddleware,
-          modelConfig.findById
+          modelConfig.findById,
         );
         fastify.get(
           `${prefix}/:id`,
@@ -154,25 +171,32 @@ export class RouteGenerator {
             const canProceed = await MiddlewareBinder.run(
               middlewares,
               request,
-              reply
+              reply,
             );
             if (!canProceed) return;
+
+            const allowed = await this.rbac.checkAccess(
+              request,
+              reply,
+              modelConfig.findById?.roles,
+            );
+            if (!allowed) return;
 
             const { id } = request.params as { id: string };
             const query = request.query as Record<string, string>;
             const includeParam = query.include
               ? Object.fromEntries(
-                  query.include.split(",").map((r: string) => [r.trim(), true])
+                  query.include.split(",").map((r: string) => [r.trim(), true]),
                 )
               : undefined;
 
             const result = await this.engine.findById(
               modelName,
               id,
-              includeParam
+              includeParam,
             );
             this.send(reply, result);
-          }
+          },
         );
       }
 
@@ -180,7 +204,7 @@ export class RouteGenerator {
       if (this.config.isRouteEnabled(modelName, "create")) {
         const middlewares = MiddlewareBinder.bind(
           globalMiddleware,
-          modelConfig.create
+          modelConfig.create,
         );
         fastify.post(
           prefix,
@@ -188,9 +212,16 @@ export class RouteGenerator {
             const canProceed = await MiddlewareBinder.run(
               middlewares,
               request,
-              reply
+              reply,
             );
             if (!canProceed) return;
+
+            const allowed = await this.rbac.checkAccess(
+              request,
+              reply,
+              modelConfig.create?.roles,
+            );
+            if (!allowed) return;
 
             const result = await this.engine.create(modelName, {
               data: request.body as Record<string, unknown>,
@@ -200,7 +231,7 @@ export class RouteGenerator {
             } else {
               reply.status(201).send(result);
             }
-          }
+          },
         );
       }
 
@@ -208,7 +239,7 @@ export class RouteGenerator {
       if (this.config.isRouteEnabled(modelName, "update")) {
         const middlewares = MiddlewareBinder.bind(
           globalMiddleware,
-          modelConfig.update
+          modelConfig.update,
         );
         fastify.patch(
           `${prefix}/:id`,
@@ -216,9 +247,16 @@ export class RouteGenerator {
             const canProceed = await MiddlewareBinder.run(
               middlewares,
               request,
-              reply
+              reply,
             );
             if (!canProceed) return;
+
+            const allowed = await this.rbac.checkAccess(
+              request,
+              reply,
+              modelConfig.update?.roles,
+            );
+            if (!allowed) return;
 
             const { id } = request.params as { id: string };
             const result = await this.engine.update(modelName, {
@@ -226,7 +264,7 @@ export class RouteGenerator {
               data: request.body as Record<string, unknown>,
             });
             this.send(reply, result);
-          }
+          },
         );
       }
 
@@ -234,7 +272,7 @@ export class RouteGenerator {
       if (this.config.isRouteEnabled(modelName, "delete")) {
         const middlewares = MiddlewareBinder.bind(
           globalMiddleware,
-          modelConfig.delete
+          modelConfig.delete,
         );
         fastify.delete(
           `${prefix}/:id`,
@@ -242,16 +280,23 @@ export class RouteGenerator {
             const canProceed = await MiddlewareBinder.run(
               middlewares,
               request,
-              reply
+              reply,
             );
             if (!canProceed) return;
+
+            const allowed = await this.rbac.checkAccess(
+              request,
+              reply,
+              modelConfig.delete?.roles,
+            );
+            if (!allowed) return;
 
             const { id } = request.params as { id: string };
             const result = await this.engine.delete(modelName, {
               where: { id },
             });
             this.send(reply, result);
-          }
+          },
         );
       }
 
@@ -259,7 +304,7 @@ export class RouteGenerator {
       if (this.config.isRouteEnabled(modelName, "restore")) {
         const middlewares = MiddlewareBinder.bind(
           globalMiddleware,
-          modelConfig.restore
+          modelConfig.restore,
         );
         fastify.patch(
           `${prefix}/:id/restore`,
@@ -267,11 +312,19 @@ export class RouteGenerator {
             const canProceed = await MiddlewareBinder.run(
               middlewares,
               request,
-              reply
+              reply,
             );
             if (!canProceed) return;
 
             const { id } = request.params as { id: string };
+
+            const allowed = await this.rbac.checkAccess(
+              request,
+              reply,
+              modelConfig.restore?.roles,
+            );
+            if (!allowed) return;
+
             try {
               const result = await this.adapter.restore(modelName, id);
               reply.send({
@@ -290,7 +343,7 @@ export class RouteGenerator {
                 error: { code: "BAD_REQUEST" },
               });
             }
-          }
+          },
         );
       }
     }

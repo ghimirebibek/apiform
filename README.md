@@ -334,6 +334,60 @@ apiform does not prevent linking records to soft deleted related records. It is 
 
 ---
 
+## Role-Based Access Control (RBAC)
+
+Protect your auto-generated routes with role-based access control. apiform checks the user's roles from the request and returns `403 FORBIDDEN` if they don't have the required role.
+
+**Setup:**
+
+```ts
+const app = new ApiForm(prisma, {
+  rbac: {
+    rolesPath: "user.roles", // where to find roles on the request (default: "user.roles")
+    globalRoles: ["user"], // roles required for ALL routes
+  },
+  models: {
+    user: {
+      findAll: { roles: ["admin"] }, // override — only admin can list users
+      delete: { roles: ["admin"] }, // override — only admin can delete
+    },
+  },
+});
+```
+
+**How it works:**
+
+- `globalRoles` applies to every route unless overridden
+- Per-route `roles` overrides `globalRoles` for that specific route
+- If no roles are configured, the route is public
+- Roles are looked up from the request using `rolesPath` (supports dot notation e.g. `auth.user.roles`)
+
+**Custom roles path:**
+
+```ts
+rbac: {
+  rolesPath: "auth.roles",  // looks at request.auth.roles
+}
+```
+
+**Response when access is denied:**
+
+```json
+{
+  "success": false,
+  "message": "You do not have permission to access this resource",
+  "data": null,
+  "meta": null,
+  "error": {
+    "code": "FORBIDDEN"
+  }
+}
+```
+
+> **Note:** apiform does not handle authentication — it only checks roles. You are responsible for populating `request.user` (or your custom path) via your own auth middleware before apiform's RBAC runs.
+
+---
+
 ## TypeScript Generics
 
 All CRUD operations support TypeScript generics for fully typed responses:
@@ -388,9 +442,13 @@ GET /api/posts?include=author,comments
 
 ```ts
 new ApiForm(prismaClient, {
-  globalPrefix?: string;         // default: "/api"
-  globalMiddleware?: Function[];  // runs before every route
-  schemaPath?: string;           // custom path to schema.prisma
+  globalPrefix?: string;          // default: "/api"
+  globalMiddleware?: Function[];   // runs before every route
+  schemaPath?: string;            // custom path to schema.prisma
+  rbac?: {
+    rolesPath?: string;           // default: "user.roles"
+    globalRoles?: string[];       // roles required for all routes
+  };
   models?: {
     [modelName]: boolean | {
       prefix?: string;
@@ -408,8 +466,9 @@ new ApiForm(prismaClient, {
 
 // RouteOptions
 {
-  enabled?: boolean;       // default: true
-  middleware?: Function[]; // route-level middleware
+  enabled?: boolean;        // default: true
+  middleware?: Function[];  // route-level middleware
+  roles?: string[];         // roles required for this route
 }
 ```
 
@@ -431,4 +490,4 @@ new ApiForm(prismaClient, {
 
 ## License
 
-MIT © [Bibek Ghimire](https://github.com/ghimirebibek)
+MIT © [Bibek Raj Ghimire](https://github.com/ghimirebibek)

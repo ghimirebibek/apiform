@@ -2,13 +2,18 @@ import type { FastifyRequest, FastifyReply } from "fastify";
 
 export type MiddlewareFunction = (
   request: FastifyRequest,
-  reply: FastifyReply
+  reply: FastifyReply,
 ) => Promise<void> | void;
 
 export interface RouteOptions {
   enabled?: boolean;
   middleware?: MiddlewareFunction[];
-  prefix?: string;
+  roles?: string[];
+}
+
+export interface RbacConfig {
+  rolesPath?: string; // default: "user.roles"
+  globalRoles?: string[]; // roles required for all routes
 }
 
 export interface ModelRouteConfig {
@@ -20,7 +25,7 @@ export interface ModelRouteConfig {
   restore?: RouteOptions;
   findDeleted?: RouteOptions;
   prefix?: string;
-  softDelete?: boolean | string; // true = use deletedAt, string = custom field name
+  softDelete?: boolean | string;
 }
 
 export interface ApiFormConfig {
@@ -28,4 +33,5 @@ export interface ApiFormConfig {
   globalPrefix?: string;
   globalMiddleware?: MiddlewareFunction[];
   schemaPath?: string;
+  rbac?: RbacConfig;
 }
