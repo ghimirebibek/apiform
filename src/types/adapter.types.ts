@@ -25,12 +25,23 @@ export interface ModelField {
   isRequired: boolean;
   isId: boolean;
   isUnique: boolean;
+  isUpdatedAt?: boolean;
   default?: unknown;
 }
 
 export interface ModelDefinition {
   name: string;
   fields: ModelField[];
+}
+
+export interface EnumDefinition {
+  name: string;
+  values: string[];
+}
+
+export interface SchemaDefinition {
+  models: ModelDefinition[];
+  enums: EnumDefinition[];
 }
 
 export interface AdapterConfig {

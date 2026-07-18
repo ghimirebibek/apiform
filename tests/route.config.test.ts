@@ -78,4 +78,52 @@ describe("RouteConfig", () => {
     expect(config.isModelEnabled("USER")).toBe(true);
     expect(config.isModelEnabled("user")).toBe(true);
   });
+
+  it("should disable restore/findDeleted by default even when model is true", () => {
+    const config = new RouteConfig({ models: { user: true } });
+
+    expect(config.isRouteEnabled("user", "restore")).toBe(false);
+    expect(config.isRouteEnabled("user", "findDeleted")).toBe(false);
+  });
+
+  it("should disable restore/findDeleted by default when model is unconfigured", () => {
+    const config = new RouteConfig({});
+
+    expect(config.isRouteEnabled("user", "restore")).toBe(false);
+    expect(config.isRouteEnabled("user", "findDeleted")).toBe(false);
+  });
+
+  it("should enable restore/findDeleted when explicitly opted in", () => {
+    const config = new RouteConfig({
+      models: {
+        user: {
+          restore: { enabled: true },
+          findDeleted: { enabled: true },
+        },
+      },
+    });
+
+    expect(config.isRouteEnabled("user", "restore")).toBe(true);
+    expect(config.isRouteEnabled("user", "findDeleted")).toBe(true);
+  });
+
+  it("should preserve per-route roles for restore/findDeleted", () => {
+    const config = new RouteConfig({
+      models: {
+        user: {
+          restore: { enabled: true, roles: ["admin"] },
+        },
+      },
+    });
+
+    const modelConfig = config.getModelConfig("user");
+    expect(modelConfig.restore?.roles).toEqual(["admin"]);
+  });
+
+  it("should keep restore/findDeleted disabled when model is false", () => {
+    const config = new RouteConfig({ models: { user: false } });
+
+    expect(config.isRouteEnabled("user", "restore")).toBe(false);
+    expect(config.isRouteEnabled("user", "findDeleted")).toBe(false);
+  });
 });

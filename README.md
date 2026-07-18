@@ -581,6 +581,16 @@ new ApiForm(prismaClient, {
 
 ---
 
+## Request Validation
+
+`create`/`update` request bodies are validated against a schema derived from your Prisma model, before anything reaches the database:
+
+- Scalar fields are checked against their Prisma type (`String`, `Int`, `Boolean`, `DateTime`, `Json`, etc.).
+- **Enum fields are validated against the enum's actual members** — `role: "SUPERADMIN"` is rejected if your `enum Role { ADMIN EDITOR VIEWER }` doesn't include it.
+- The primary key, `@updatedAt` fields, any field with an auto-generated default (`@default(now())`, `@default(autoincrement())`, etc.), and the resolved soft-delete field are never client-writable — even if the client includes them in the request body, they're stripped before the write, not just before the response.
+
+---
+
 ## Error Codes
 
 | Code               | Description                    |

@@ -9,12 +9,21 @@ const DEFAULT_ROUTE_OPTIONS: RouteOptions = {
   middleware: [],
 };
 
+// restore/findDeleted are opt-in (see README "Soft Delete" section) — they
+// default to disabled, unlike the other routes.
+const DEFAULT_DISABLED_ROUTE_OPTIONS: RouteOptions = {
+  ...DEFAULT_ROUTE_OPTIONS,
+  enabled: false,
+};
+
 const DEFAULT_MODEL_ROUTE_CONFIG: ModelRouteConfig = {
   create: { ...DEFAULT_ROUTE_OPTIONS },
   findAll: { ...DEFAULT_ROUTE_OPTIONS },
   findById: { ...DEFAULT_ROUTE_OPTIONS },
   update: { ...DEFAULT_ROUTE_OPTIONS },
   delete: { ...DEFAULT_ROUTE_OPTIONS },
+  restore: { ...DEFAULT_DISABLED_ROUTE_OPTIONS },
+  findDeleted: { ...DEFAULT_DISABLED_ROUTE_OPTIONS },
   prefix: undefined,
 };
 
@@ -45,6 +54,8 @@ export class RouteConfig {
         findById: { enabled: false },
         update: { enabled: false },
         delete: { enabled: false },
+        restore: { enabled: false },
+        findDeleted: { enabled: false },
       };
     }
 
@@ -60,6 +71,14 @@ export class RouteConfig {
       findById: this.mergeRouteOptions(modelConfig.findById),
       update: this.mergeRouteOptions(modelConfig.update),
       delete: this.mergeRouteOptions(modelConfig.delete),
+      restore: this.mergeRouteOptions(
+        modelConfig.restore,
+        DEFAULT_DISABLED_ROUTE_OPTIONS
+      ),
+      findDeleted: this.mergeRouteOptions(
+        modelConfig.findDeleted,
+        DEFAULT_DISABLED_ROUTE_OPTIONS
+      ),
       prefix: modelConfig.prefix,
     };
   }
@@ -88,9 +107,12 @@ export class RouteConfig {
     return `${globalPrefix}${modelPrefix}`;
   }
 
-  private mergeRouteOptions(options?: RouteOptions): RouteOptions {
+  private mergeRouteOptions(
+    options?: RouteOptions,
+    base: RouteOptions = DEFAULT_ROUTE_OPTIONS
+  ): RouteOptions {
     return {
-      ...DEFAULT_ROUTE_OPTIONS,
+      ...base,
       ...options,
     };
   }

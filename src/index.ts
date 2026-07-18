@@ -101,5 +101,7 @@ export type {
 export type {
   ModelDefinition,
   ModelField,
+  EnumDefinition,
+  SchemaDefinition,
   IAdapter,
 } from "./types/adapter.types";

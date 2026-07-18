@@ -15,6 +15,9 @@ import type {
   CrudResult,
 } from "../../types/crud.types";
 import type { ModelRouteConfig } from "../../types/config.types";
+import type { ModelField } from "../../types/adapter.types";
+
+const NUMERIC_FIELD_TYPES = new Set(["int", "integer", "float", "decimal", "bigint"]);
 
 export class PrismaAdapter extends BaseAdapter {
   private client: PrismaClient;
@@ -35,7 +38,9 @@ export class PrismaAdapter extends BaseAdapter {
 
   async connect(): Promise<void> {
     await this.client.$connect();
-    this.models = this.schemaReader.read();
+    const schema = this.schemaReader.read();
+    this.models = schema.models;
+    this.enums = schema.enums;
   }
 
   async disconnect(): Promise<void> {
@@ -65,6 +70,10 @@ export class PrismaAdapter extends BaseAdapter {
     return this.modelConfigs[model.toLowerCase()]?.omit ?? [];
   }
 
+  override getSoftDeleteField(model: string): string | null {
+    return this.getDeletedAtField(model);
+  }
+
   private mask<T>(model: string, data: T): T {
     return FieldMasker.mask(
       data,
@@ -72,6 +81,46 @@ export class PrismaAdapter extends BaseAdapter {
       (name) => this.getModel(name),
       (name) => this.getOmitFields(name)
     ) as T;
+  }
+
+  private getIdField(model: string): ModelField | undefined {
+    return this.getModel(model)?.fields.find((f) => f.isId);
+  }
+
+  // Coerce a URL/path param value to the field's declared scalar type.
+  // Previously this guessed numeric-vs-string via isNaN(Number(v)), which
+  // wrongly coerced String-typed IDs (e.g. cuid/uuid) that happen to look
+  // numeric. Now it only coerces when the field is actually a numeric type.
+  private coerceIdValue(value: unknown, field?: ModelField): unknown {
+    if (typeof value !== "string" || !field) return value;
+    if (!NUMERIC_FIELD_TYPES.has(field.type.toLowerCase())) return value;
+    const numeric = Number(value);
+    return Number.isNaN(numeric) ? value : numeric;
+  }
+
+  // Build a Prisma `where` clause for a single-record lookup by id. The
+  // router always names the URL param "id" regardless of what the model's
+  // actual primary key field is called, so remap it here.
+  private buildIdWhere(model: string, id: string | number): Record<string, unknown> {
+    const idField = this.getIdField(model);
+    const fieldName = idField?.name ?? "id";
+    return { [fieldName]: this.coerceIdValue(id, idField) };
+  }
+
+  private resolveWhere(
+    model: string,
+    where: Record<string, unknown>
+  ): Record<string, unknown> {
+    const modelDef = this.getModel(model);
+    const idField = this.getIdField(model);
+
+    return Object.fromEntries(
+      Object.entries(where).map(([key, value]) => {
+        const targetKey = key === "id" && idField ? idField.name : key;
+        const field = modelDef?.fields.find((f) => f.name === targetKey);
+        return [targetKey, this.coerceIdValue(value, field)];
+      })
+    );
   }
 
   async findAll(
@@ -166,13 +215,13 @@ export class PrismaAdapter extends BaseAdapter {
 
   async findById(
     model: string,
-    id: string | number
+    id: string | number,
+    include?: Record<string, boolean>
   ): Promise<CrudResult<unknown>> {
     const delegate = this.getDelegate(model);
-    const parsedId =
-      typeof id === "string" && !isNaN(Number(id)) ? Number(id) : id;
     const data = await delegate.findUnique({
-      where: { id: parsedId },
+      where: this.buildIdWhere(model, id),
+      ...(include ? { include } : {}),
     });
     return { data: this.mask(model, data) };
   }
@@ -191,12 +240,7 @@ export class PrismaAdapter extends BaseAdapter {
     options: UpdateOptions
   ): Promise<CrudResult<unknown>> {
     const delegate = this.getDelegate(model);
-    const where = Object.fromEntries(
-      Object.entries(options.where).map(([k, v]) => [
-        k,
-        typeof v === "string" && !isNaN(Number(v)) ? Number(v) : v,
-      ])
-    );
+    const where = this.resolveWhere(model, options.where);
     const data = await delegate.update({ where, data: options.data });
     return { data: this.mask(model, data) };
   }
@@ -207,14 +251,7 @@ export class PrismaAdapter extends BaseAdapter {
   ): Promise<CrudResult<unknown>> {
     const deletedAtField = this.getDeletedAtField(model);
     const delegate = this.getDelegate(model);
-
-    // Parse id to number if needed
-    const where = Object.fromEntries(
-      Object.entries(options.where).map(([k, v]) => [
-        k,
-        typeof v === "string" && !isNaN(Number(v)) ? Number(v) : v,
-      ])
-    );
+    const where = this.resolveWhere(model, options.where);
 
     if (deletedAtField) {
       const data = await delegate.update({
@@ -237,11 +274,9 @@ export class PrismaAdapter extends BaseAdapter {
       throw new Error(`Model "${model}" does not support soft delete`);
     }
 
-    const parsedId =
-      typeof id === "string" && !isNaN(Number(id)) ? Number(id) : id;
     const delegate = this.getDelegate(model);
     const data = await delegate.update({
-      where: { id: parsedId },
+      where: this.buildIdWhere(model, id),
       data: SoftDeleteManager.restoreData(deletedAtField),
     });
     return { data: this.mask(model, data) };

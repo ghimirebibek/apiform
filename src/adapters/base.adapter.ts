@@ -6,10 +6,11 @@ import type {
   DeleteOptions,
   CrudResult,
 } from "../types/crud.types";
-import type { ModelDefinition } from "../types/adapter.types";
+import type { EnumDefinition, ModelDefinition } from "../types/adapter.types";
 
 export abstract class BaseAdapter {
   protected models: ModelDefinition[] = [];
+  protected enums: EnumDefinition[] = [];
 
   abstract connect(): Promise<void>;
   abstract disconnect(): Promise<void>;
@@ -59,5 +60,17 @@ export abstract class BaseAdapter {
 
   getOmitFields(_name: string): string[] {
     return [];
+  }
+
+  getSoftDeleteField(_name: string): string | null {
+    return null;
+  }
+
+  getEnums(): EnumDefinition[] {
+    return this.enums;
+  }
+
+  getEnum(name: string): EnumDefinition | undefined {
+    return this.enums.find((e) => e.name.toLowerCase() === name.toLowerCase());
   }
 }

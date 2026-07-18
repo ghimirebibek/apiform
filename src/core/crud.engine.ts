@@ -12,12 +12,28 @@ import type {
 } from "../types/crud.types";
 import { Validator } from "./validator";
 import { FieldMasker } from "./field.masker";
+import type { ModelDefinition } from "../types/adapter.types";
 
 export class CrudEngine {
   private adapter: BaseAdapter;
 
   constructor(adapter: BaseAdapter) {
     this.adapter = adapter;
+  }
+
+  // Fields a client may set on create/update: excludes the PK, any
+  // @updatedAt field, any field auto-defaulted via @default(now()) (e.g.
+  // createdAt — regardless of what it's actually named), and the model's
+  // resolved soft-delete field (which itself may be renamed via config).
+  private getWritableFields(model: string, modelDef: ModelDefinition) {
+    const softDeleteField = this.adapter.getSoftDeleteField(model);
+    return modelDef.fields.filter((f) => {
+      if (f.isId) return false;
+      if (f.isUpdatedAt) return false;
+      if (f.default === "now()") return false;
+      if (softDeleteField && f.name === softDeleteField) return false;
+      return true;
+    });
   }
 
   async findAll<T = unknown>(
@@ -96,22 +112,23 @@ export class CrudEngine {
   ): Promise<ApiResponse<T>> {
     try {
       const modelDef = this.adapter.getModel(model);
+      let data: Record<string, unknown> = options.data;
       if (modelDef) {
-        const writableFields = modelDef.fields.filter(
-          (f) =>
-            !f.isId &&
-            f.name !== "createdAt" &&
-            f.name !== "updatedAt" &&
-            f.name !== "deletedAt"
+        const writableFields = this.getWritableFields(model, modelDef);
+        const schema = Validator.buildSchema(writableFields, (name) =>
+          this.adapter.getEnum(name)
         );
-        const schema = Validator.buildSchema(writableFields);
         const validation = Validator.validate(schema, options.data);
         if (!validation.success) {
           return validation.error as any;
         }
+        // Forward the Zod-parsed, whitelist-stripped data — not the raw
+        // request body — so fields outside the writable set (id, timestamps,
+        // anything the model doesn't expose) can never reach the database.
+        data = validation.data as Record<string, unknown>;
       }
 
-      const result = await this.adapter.create(model, options);
+      const result = await this.adapter.create(model, { ...options, data });
       return ResponseFormatter.success<T>(
         result.data as T,
         ResponseFormatter.formatMessage("create", model)
@@ -127,24 +144,22 @@ export class CrudEngine {
   ): Promise<ApiResponse<T>> {
     try {
       const modelDef = this.adapter.getModel(model);
+      let data: Record<string, unknown> = options.data;
       if (modelDef) {
-        const writableFields = modelDef.fields
-          .filter(
-            (f) =>
-              !f.isId &&
-              f.name !== "createdAt" &&
-              f.name !== "updatedAt" &&
-              f.name !== "deletedAt"
-          )
-          .map((f) => ({ ...f, isRequired: false })); // all fields optional on update
-        const schema = Validator.buildSchema(writableFields);
+        const writableFields = this.getWritableFields(model, modelDef).map(
+          (f) => ({ ...f, isRequired: false }) // all fields optional on update
+        );
+        const schema = Validator.buildSchema(writableFields, (name) =>
+          this.adapter.getEnum(name)
+        );
         const validation = Validator.validate(schema, options.data);
         if (!validation.success) {
           return validation.error as any;
         }
+        data = validation.data as Record<string, unknown>;
       }
 
-      const result = await this.adapter.update(model, options);
+      const result = await this.adapter.update(model, { ...options, data });
       return ResponseFormatter.success<T>(
         result.data as T,
         ResponseFormatter.formatMessage("update", model)

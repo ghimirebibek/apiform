@@ -1,6 +1,11 @@
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";
-import type { ModelDefinition, ModelField } from "../../types/adapter.types";
+import type {
+  EnumDefinition,
+  ModelDefinition,
+  ModelField,
+  SchemaDefinition,
+} from "../../types/adapter.types";
 
 export class SchemaReader {
   private schemaPath: string;
@@ -10,7 +15,7 @@ export class SchemaReader {
       schemaPath ?? join(process.cwd(), "prisma", "schema.prisma");
   }
 
-  read(): ModelDefinition[] {
+  read(): SchemaDefinition {
     if (!existsSync(this.schemaPath)) {
       throw new Error(`Prisma schema not found at: ${this.schemaPath}`);
     }
@@ -19,12 +24,14 @@ export class SchemaReader {
     return this.parse(content);
   }
 
-  private parse(content: string): ModelDefinition[] {
+  private parse(content: string): SchemaDefinition {
+    const stripped = SchemaReader.stripBlockComments(content);
+
     const models: ModelDefinition[] = [];
     const modelRegex = /model\s+(\w+)\s*\{([^}]+)\}/g;
 
     let match;
-    while ((match = modelRegex.exec(content)) !== null) {
+    while ((match = modelRegex.exec(stripped)) !== null) {
       const modelName = match[1];
       const modelBody = match[2];
       if (!modelName || !modelBody) continue;
@@ -36,7 +43,37 @@ export class SchemaReader {
       });
     }
 
-    return models;
+    const enums: EnumDefinition[] = [];
+    const enumRegex = /enum\s+(\w+)\s*\{([^}]+)\}/g;
+
+    while ((match = enumRegex.exec(stripped)) !== null) {
+      const enumName = match[1];
+      const enumBody = match[2];
+      if (!enumName || !enumBody) continue;
+
+      enums.push({
+        name: enumName,
+        values: this.parseEnumValues(enumBody),
+      });
+    }
+
+    return { models, enums };
+  }
+
+  // Prisma block comments (/* ... */) can appear anywhere, including mid
+  // model, and would otherwise corrupt the naive line-based field parsing.
+  private static stripBlockComments(content: string): string {
+    return content.replace(/\/\*[\s\S]*?\*\//g, "");
+  }
+
+  private parseEnumValues(body: string): string[] {
+    return body
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .filter((l) => !l.startsWith("@@") && !l.startsWith("//"))
+      .map((l) => l.split(/\s+/)[0])
+      .filter((v): v is string => Boolean(v));
   }
 
   private parseFields(body: string): ModelField[] {
@@ -56,7 +93,12 @@ export class SchemaReader {
     return fields;
   }
 
-  private parseLine(line: string): ModelField | null {
+  private parseLine(rawLine: string): ModelField | null {
+    // Strip a trailing line comment so it can't be mistaken for an
+    // attribute (e.g. `age Int // uses @default in the future`).
+    const line = rawLine.replace(/\/\/.*$/, "").trim();
+    if (!line) return null;
+
     const parts = line.split(/\s+/);
     if (parts.length < 2) return null;
 
@@ -72,11 +114,15 @@ export class SchemaReader {
 
     const isId = line.includes("@id");
     const isUnique = line.includes("@unique");
+    const isUpdatedAt = line.includes("@updatedAt");
     const hasDefault = line.includes("@default");
 
     let defaultValue: unknown = undefined;
     if (hasDefault) {
-      const defaultMatch = line.match(/@default\(([^)]+)\)/);
+      // Allows one level of nested parens so zero-arg default functions
+      // like now()/autoincrement()/uuid()/cuid() are captured in full
+      // instead of being truncated at their own inner ")".
+      const defaultMatch = line.match(/@default\(((?:[^()]|\([^()]*\))*)\)/);
       if (defaultMatch) {
         defaultValue = defaultMatch[1];
       }
@@ -88,6 +134,7 @@ export class SchemaReader {
       isRequired,
       isId,
       isUnique,
+      isUpdatedAt,
       default: defaultValue,
     };
   }
