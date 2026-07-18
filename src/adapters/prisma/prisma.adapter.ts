@@ -143,8 +143,9 @@ export class PrismaAdapter extends BaseAdapter {
 
     const modelDef = this.getModel(model);
     const allModelNames = new Set(this.models.map((m) => m.name.toLowerCase()));
+    const omitFields = this.getOmitFields(model);
     const safeFilters = modelDef
-      ? FilterBuilder.build(filters, modelDef, allModelNames)
+      ? FilterBuilder.build(filters, modelDef, allModelNames, omitFields)
       : {};
 
     let whereClause: Record<string, unknown> = { ...where, ...safeFilters };
@@ -152,7 +153,7 @@ export class PrismaAdapter extends BaseAdapter {
     const searchAllowed =
       searchBy &&
       modelDef &&
-      FilterBuilder.isFilterableField(searchBy, modelDef, allModelNames);
+      FilterBuilder.isFilterableField(searchBy, modelDef, allModelNames, omitFields);
     if (searchAllowed && searchValue) {
       whereClause[searchBy] = { contains: searchValue, mode: "insensitive" };
     }
@@ -219,10 +220,21 @@ export class PrismaAdapter extends BaseAdapter {
     include?: Record<string, boolean>
   ): Promise<CrudResult<unknown>> {
     const delegate = this.getDelegate(model);
-    const data = await delegate.findUnique({
-      where: this.buildIdWhere(model, id),
-      ...(include ? { include } : {}),
-    });
+    let where = this.buildIdWhere(model, id);
+
+    const deletedAtField = this.getDeletedAtField(model);
+    if (deletedAtField) {
+      where = SoftDeleteManager.excludeDeleted(where, deletedAtField);
+    }
+
+    // findUnique can't take a compound/non-unique where (e.g. the added
+    // deletedAt filter breaks findUnique's single-unique-field contract
+    // once more than the id is present), so once soft-delete exclusion is
+    // in play this has to use findFirst instead.
+    const data = deletedAtField
+      ? await delegate.findFirst({ where, ...(include ? { include } : {}) })
+      : await delegate.findUnique({ where, ...(include ? { include } : {}) });
+
     return { data: this.mask(model, data) };
   }
 

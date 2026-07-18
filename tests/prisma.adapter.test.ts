@@ -24,6 +24,12 @@ model Widget {
   widgetId String @id @default(cuid())
   label    String
 }
+
+model Account {
+  id        Int       @id @default(autoincrement())
+  name      String
+  deletedAt DateTime?
+}
 `;
 
 function makeDelegate() {
@@ -68,6 +74,7 @@ function makeClient() {
     user: makeDelegate(),
     post: makeDelegate(),
     widget: makeDelegate(),
+    account: makeDelegate(),
   };
 }
 
@@ -141,5 +148,40 @@ describe("PrismaAdapter — id resolution", () => {
       where: { id: 5 },
       include: { comments: true },
     });
+  });
+});
+
+describe("PrismaAdapter — findById excludes soft-deleted records", () => {
+  beforeAll(() => {
+    mkdirSync(join(process.cwd(), "tests/fixtures"), { recursive: true });
+    writeFileSync(TEST_SCHEMA_PATH, TEST_SCHEMA);
+  });
+
+  afterAll(() => {
+    rmSync(join(process.cwd(), "tests/fixtures"), { recursive: true, force: true });
+  });
+
+  it("uses findFirst with a deletedAt:null filter for a soft-delete-enabled model", async () => {
+    const client = makeClient();
+    const adapter = new PrismaAdapter(client, TEST_SCHEMA_PATH);
+    await adapter.connect();
+
+    await adapter.findById("account", "1");
+
+    expect(client.account.calls[0]?.method).toBe("findFirst");
+    expect(client.account.calls[0]?.args).toMatchObject({
+      where: { id: 1, deletedAt: null },
+    });
+  });
+
+  it("still uses findUnique (no soft-delete filter) for a model without soft delete", async () => {
+    const client = makeClient();
+    const adapter = new PrismaAdapter(client, TEST_SCHEMA_PATH);
+    await adapter.connect();
+
+    await adapter.findById("post", "5");
+
+    expect(client.post.calls[0]?.method).toBe("findUnique");
+    expect(client.post.calls[0]?.args).toEqual({ where: { id: 5 } });
   });
 });

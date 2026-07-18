@@ -14,7 +14,7 @@ export class ErrorHandler {
       return ResponseFormatter.error(
         ErrorCode.VALIDATION_ERROR,
         ErrorCode.VALIDATION_ERROR,
-        error.errors
+        error.issues
       );
     }
 
@@ -81,7 +81,7 @@ interface PrismaError {
 }
 
 interface ZodError {
-  errors: unknown[];
+  issues: unknown[];
 }
 
 function isPrismaError(error: unknown): error is PrismaError {
@@ -98,7 +98,7 @@ function isZodError(error: unknown): error is ZodError {
   return (
     typeof error === "object" &&
     error !== null &&
-    "errors" in error &&
-    Array.isArray((error as ZodError).errors)
+    "issues" in error &&
+    Array.isArray((error as ZodError).issues)
   );
 }

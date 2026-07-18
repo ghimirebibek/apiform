@@ -9,6 +9,8 @@ import type {
   CreateOptions,
   UpdateOptions,
   DeleteOptions,
+  HookContext,
+  HookRuntime,
 } from "../types/crud.types";
 import { Validator } from "./validator";
 import { FieldMasker } from "./field.masker";
@@ -36,18 +38,35 @@ export class CrudEngine {
     });
   }
 
+  private buildHookContext(model: string, runtime?: HookRuntime): HookContext {
+    return { model, request: runtime?.request as HookContext["request"] };
+  }
+
   async findAll<T = unknown>(
     model: string,
-    options: FindAllOptions = {}
+    options: FindAllOptions = {},
+    runtime?: HookRuntime
   ): Promise<ApiResponse<T[]>> {
     try {
-      const result = await this.adapter.findAll(model, options);
-      const page = options.page ?? 1;
-      const limit = options.limit ?? 10;
-      const data = FieldMasker.select(result.data ?? [], options.fields) as T[];
+      const hooks = runtime?.hooks;
+      const ctx = this.buildHookContext(model, runtime);
+
+      let opts = options;
+      if (hooks?.beforeFindAll) {
+        opts = await hooks.beforeFindAll(opts, ctx);
+      }
+
+      const result = await this.adapter.findAll(model, opts);
+      const page = opts.page ?? 1;
+      const limit = opts.limit ?? 10;
+      let data: unknown[] = FieldMasker.select(result.data ?? [], opts.fields) as unknown[];
+
+      if (hooks?.afterFindAll) {
+        data = await hooks.afterFindAll(data, ctx);
+      }
 
       return ResponseFormatter.paginate<T>(
-        data,
+        data as T[],
         model,
         page,
         limit,
@@ -85,9 +104,17 @@ export class CrudEngine {
     model: string,
     id: string | number,
     include?: Record<string, boolean>,
-    fields?: string[]
+    fields?: string[],
+    runtime?: HookRuntime
   ): Promise<ApiResponse<T>> {
     try {
+      const hooks = runtime?.hooks;
+      const ctx = this.buildHookContext(model, runtime);
+
+      if (hooks?.beforeFindById) {
+        await hooks.beforeFindById(id, ctx);
+      }
+
       const result = await this.adapter.findById(model, id, include);
 
       if (!result.data) {
@@ -97,8 +124,13 @@ export class CrudEngine {
         );
       }
 
+      let data: unknown = FieldMasker.select(result.data, fields);
+      if (hooks?.afterFindById) {
+        data = await hooks.afterFindById(data, ctx);
+      }
+
       return ResponseFormatter.success<T>(
-        FieldMasker.select(result.data, fields) as T,
+        data as T,
         ResponseFormatter.formatMessage("findById", model)
       );
     } catch (error) {
@@ -108,7 +140,8 @@ export class CrudEngine {
 
   async create<T = unknown>(
     model: string,
-    options: CreateOptions
+    options: CreateOptions,
+    runtime?: HookRuntime
   ): Promise<ApiResponse<T>> {
     try {
       const modelDef = this.adapter.getModel(model);
@@ -128,9 +161,23 @@ export class CrudEngine {
         data = validation.data as Record<string, unknown>;
       }
 
+      const hooks = runtime?.hooks;
+      const ctx = this.buildHookContext(model, runtime);
+      if (hooks?.beforeCreate) {
+        // Runs after whitelist stripping, so a hook may safely add
+        // server-derived fields (tenantId, hashed password, audit ids)
+        // that would otherwise be rejected as non-writable client input.
+        data = await hooks.beforeCreate(data, ctx);
+      }
+
       const result = await this.adapter.create(model, { ...options, data });
+      let responseData: unknown = result.data;
+      if (hooks?.afterCreate) {
+        responseData = await hooks.afterCreate(responseData, ctx);
+      }
+
       return ResponseFormatter.success<T>(
-        result.data as T,
+        responseData as T,
         ResponseFormatter.formatMessage("create", model)
       );
     } catch (error) {
@@ -140,7 +187,8 @@ export class CrudEngine {
 
   async update<T = unknown>(
     model: string,
-    options: UpdateOptions
+    options: UpdateOptions,
+    runtime?: HookRuntime
   ): Promise<ApiResponse<T>> {
     try {
       const modelDef = this.adapter.getModel(model);
@@ -159,9 +207,20 @@ export class CrudEngine {
         data = validation.data as Record<string, unknown>;
       }
 
+      const hooks = runtime?.hooks;
+      const ctx = this.buildHookContext(model, runtime);
+      if (hooks?.beforeUpdate) {
+        data = await hooks.beforeUpdate(data, ctx);
+      }
+
       const result = await this.adapter.update(model, { ...options, data });
+      let responseData: unknown = result.data;
+      if (hooks?.afterUpdate) {
+        responseData = await hooks.afterUpdate(responseData, ctx);
+      }
+
       return ResponseFormatter.success<T>(
-        result.data as T,
+        responseData as T,
         ResponseFormatter.formatMessage("update", model)
       );
     } catch (error) {
@@ -171,13 +230,25 @@ export class CrudEngine {
 
   async delete<T = unknown>(
     model: string,
-    options: DeleteOptions
+    options: DeleteOptions,
+    runtime?: HookRuntime
   ): Promise<ApiResponse<T>> {
     try {
+      const hooks = runtime?.hooks;
+      const ctx = this.buildHookContext(model, runtime);
+
+      if (hooks?.beforeDelete) {
+        await hooks.beforeDelete(ctx);
+      }
+
       const result = await this.adapter.delete(model, options);
+      let data: unknown = result.data;
+      if (hooks?.afterDelete) {
+        data = await hooks.afterDelete(data, ctx);
+      }
 
       return ResponseFormatter.success<T>(
-        result.data as T,
+        data as T,
         ResponseFormatter.formatMessage("delete", model)
       );
     } catch (error) {

@@ -1,4 +1,5 @@
 import { describe, it, expect } from "bun:test";
+import { z } from "zod";
 import { ErrorHandler } from "../src/core/error.handler";
 import { ErrorCode } from "../src/types/response.types";
 
@@ -52,13 +53,19 @@ describe("ErrorHandler", () => {
     expect(response.error?.code).toBe(ErrorCode.INTERNAL_ERROR);
   });
 
-  it("should handle Zod validation errors", () => {
-    const zodError = {
-      errors: [{ message: "Invalid email", path: ["email"] }],
-    };
-    const response = ErrorHandler.handle(zodError);
+  it("should handle a real Zod validation error as VALIDATION_ERROR, not INTERNAL_ERROR", () => {
+    // Uses a real ZodError (not a hand-shaped mock) so this test breaks if
+    // Zod ever changes its error shape again, instead of silently passing
+    // against a stale shape the way the previous `{ errors: [...] }` mock did.
+    const schema = z.object({ email: z.string().email() });
+    const result = schema.safeParse({ email: "not-an-email" });
+    expect(result.success).toBe(false);
+
+    const response = ErrorHandler.handle(result.error);
 
     expect(response.success).toBe(false);
     expect(response.error?.code).toBe(ErrorCode.VALIDATION_ERROR);
+    expect(ErrorHandler.getHttpStatus(response.error!.code)).toBe(400);
+    expect(Array.isArray(response.error?.details)).toBe(true);
   });
 });

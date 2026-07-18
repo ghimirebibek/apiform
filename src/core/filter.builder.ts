@@ -31,11 +31,17 @@ export class FilterBuilder {
   static build(
     filters: Record<string, unknown>,
     modelDef: ModelDefinition,
-    allModelNames: Set<string>
+    allModelNames: Set<string>,
+    omitFields: string[] = []
   ): Record<string, unknown> {
+    const omit = new Set(omitFields.map((f) => f.toLowerCase()));
     const scalarFieldNames = new Set(
       modelDef.fields
-        .filter((f) => FilterBuilder.isFilterableScalar(f, allModelNames))
+        .filter(
+          (f) =>
+            FilterBuilder.isFilterableScalar(f, allModelNames) &&
+            !omit.has(f.name.toLowerCase())
+        )
         .map((f) => f.name)
     );
 
@@ -51,12 +57,22 @@ export class FilterBuilder {
   }
 
   // Used to validate a single field name (e.g. ?searchBy=) against the
-  // same scalar-field whitelist used for `filters`.
+  // same scalar-field whitelist used for `filters`. A field the model
+  // configures as `omit` (hidden from every response) can never be
+  // filtered/searched either — otherwise its value could be probed
+  // indirectly (e.g. by observing which filter values return a match)
+  // even though it never appears in a response body.
   static isFilterableField(
     fieldName: string,
     modelDef: ModelDefinition,
-    allModelNames: Set<string>
+    allModelNames: Set<string>,
+    omitFields: string[] = []
   ): boolean {
+    const isOmitted = omitFields.some(
+      (f) => f.toLowerCase() === fieldName.toLowerCase()
+    );
+    if (isOmitted) return false;
+
     const field = modelDef.fields.find((f) => f.name === fieldName);
     return field ? FilterBuilder.isFilterableScalar(field, allModelNames) : false;
   }

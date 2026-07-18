@@ -295,6 +295,45 @@ app.addRoutes((fastify) => {
 
 ---
 
+## Lifecycle Hooks
+
+`addRoutes()` overrides an entire route — you lose pagination, RBAC, rate limiting, and field masking and have to reimplement them yourself. Lifecycle hooks let you inject logic into apiform's own generated routes instead, without giving any of that up.
+
+```ts
+const app = new ApiForm(prisma, {
+  models: {
+    user: {
+      hooks: {
+        beforeCreate: async (data, ctx) => {
+          return { ...data, password: await hash(data.password as string) };
+        },
+        afterCreate: (record, ctx) => {
+          sendWelcomeEmail(record);
+          return record;
+        },
+        beforeFindAll: (options, ctx) => ({
+          ...options,
+          where: { ...options.where, tenantId: ctx.request.user.tenantId },
+        }),
+      },
+    },
+  },
+});
+```
+
+**Available hooks:** `beforeCreate`, `afterCreate`, `beforeUpdate`, `afterUpdate`, `beforeDelete`, `afterDelete`, `beforeFindAll`, `afterFindAll`, `beforeFindById`, `afterFindById`.
+
+**How it works:**
+
+- Every hook receives a `ctx: { model: string; request: FastifyRequest }` as its last argument, so you can read `request.user`, headers, etc.
+- `beforeCreate`/`beforeUpdate` run **after** the writable-field whitelist has already validated and stripped the request body — so they can safely add fields (like `tenantId`, a hashed password, an audit user id) that a client isn't allowed to set directly. Whatever the hook returns becomes the data that's written.
+- `after*` hooks receive the record apiform is about to return and must return the (optionally modified) value that actually gets sent to the client.
+- `beforeFindAll` receives the resolved query options (`where`, `filters`, `page`, etc.) and must return the options to actually run — this is the mechanism for tenant/row-level scoping.
+- `beforeDelete`/`beforeFindById` don't return data; throw inside them to abort the operation. A thrown error is turned into a normal error response (500 by default) — if you need a specific HTTP status for a rejection, use route-level `middleware` instead, which has direct access to `reply`.
+- Hooks are per-model, not per-route — they run regardless of whether the request came from an auto-generated route.
+
+---
+
 ## Soft Delete
 
 Models with a `deletedAt DateTime?` field automatically use soft delete — records are never permanently deleted, just marked with a timestamp.
@@ -556,6 +595,7 @@ new ApiForm(prismaClient, {
       prefix?: string;
       softDelete?: boolean | string;
       omit?: string[];         // fields always stripped from responses
+      hooks?: ModelHooks;      // lifecycle hooks (see "Lifecycle Hooks")
       create?: RouteOptions;
       findAll?: RouteOptions;
       findById?: RouteOptions;

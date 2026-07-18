@@ -113,6 +113,19 @@ describe("FilterBuilder.build", () => {
     );
     expect(result).toEqual({ age: { gte: 18 } });
   });
+
+  it("drops a field that is configured as omit, even though it's a real scalar field", () => {
+    // A field hidden from every response (e.g. password) must not be
+    // filterable either — otherwise its value/existence can be probed
+    // indirectly via which filter values return a match.
+    const result = FilterBuilder.build(
+      { password: { not: null }, name: "Alice" },
+      userModel,
+      allModelNames,
+      ["password"]
+    );
+    expect(result).toEqual({ name: "Alice" });
+  });
 });
 
 describe("FilterBuilder.isFilterableField", () => {
@@ -137,6 +150,14 @@ describe("FilterBuilder.isFilterableField", () => {
   it("rejects a field that doesn't exist on the model", () => {
     expect(
       FilterBuilder.isFilterableField("nonexistent", userModel, allModelNames)
+    ).toBe(false);
+  });
+
+  it("rejects a field configured as omit even though it's a filterable scalar", () => {
+    expect(
+      FilterBuilder.isFilterableField("password", userModel, allModelNames, [
+        "password",
+      ])
     ).toBe(false);
   });
 });

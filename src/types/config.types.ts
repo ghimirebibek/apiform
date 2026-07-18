@@ -1,4 +1,5 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
+import type { ModelHooks } from "./crud.types";
 
 export type MiddlewareFunction = (
   request: FastifyRequest,
@@ -33,6 +34,7 @@ export interface ModelRouteConfig {
   prefix?: string;
   softDelete?: boolean | string;
   omit?: string[];
+  hooks?: ModelHooks;
 }
 
 export interface ApiFormConfig {

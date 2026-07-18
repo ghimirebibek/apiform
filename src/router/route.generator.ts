@@ -4,6 +4,7 @@ import { RouteConfig } from "./route.config";
 import { MiddlewareBinder } from "./middleware.binder";
 import type { PrismaAdapter } from "../adapters/prisma/prisma.adapter";
 import type { ApiFormConfig, RouteOptions } from "../types/config.types";
+import type { ModelHooks } from "../types/crud.types";
 import { ErrorHandler } from "../core/error.handler";
 import { RbacManager } from "../core/rbac.manager";
 
@@ -39,6 +40,11 @@ export class RouteGenerator {
     } else {
       reply.send(result);
     }
+  }
+
+  private getHooks(modelName: string): ModelHooks {
+    const cfg = this.rawConfig.models?.[modelName.toLowerCase()];
+    return typeof cfg === "object" && cfg !== null ? (cfg.hooks ?? {}) : {};
   }
 
   private buildRouteConfig(routeOptions?: RouteOptions): object {
@@ -130,17 +136,21 @@ export class RouteGenerator {
               }
             }
 
-            const result = await this.engine.findAll(modelName, {
-              page: query.page ? parseInt(query.page) : 1,
-              limit: query.limit ? parseInt(query.limit) : 10,
-              searchBy: query.searchBy,
-              searchValue: query.searchValue,
-              sortBy: query.sortBy,
-              sortOrder: query.sortOrder as "asc" | "desc" | undefined,
-              filters,
-              include: includeParam,
-              fields: fieldsParam,
-            });
+            const result = await this.engine.findAll(
+              modelName,
+              {
+                page: query.page ? parseInt(query.page) : 1,
+                limit: query.limit ? parseInt(query.limit) : 10,
+                searchBy: query.searchBy,
+                searchValue: query.searchValue,
+                sortBy: query.sortBy,
+                sortOrder: query.sortOrder as "asc" | "desc" | undefined,
+                filters,
+                include: includeParam,
+                fields: fieldsParam,
+              },
+              { hooks: this.getHooks(modelName), request },
+            );
             this.send(reply, result);
           },
         );
@@ -236,6 +246,7 @@ export class RouteGenerator {
               id,
               includeParam,
               fieldsParam,
+              { hooks: this.getHooks(modelName), request },
             );
             this.send(reply, result);
           },
@@ -266,9 +277,11 @@ export class RouteGenerator {
             );
             if (!allowed) return;
 
-            const result = await this.engine.create(modelName, {
-              data: request.body as Record<string, unknown>,
-            });
+            const result = await this.engine.create(
+              modelName,
+              { data: request.body as Record<string, unknown> },
+              { hooks: this.getHooks(modelName), request },
+            );
             if (result.success === false) {
               this.send(reply, result);
             } else {
@@ -303,10 +316,11 @@ export class RouteGenerator {
             if (!allowed) return;
 
             const { id } = request.params as { id: string };
-            const result = await this.engine.update(modelName, {
-              where: { id },
-              data: request.body as Record<string, unknown>,
-            });
+            const result = await this.engine.update(
+              modelName,
+              { where: { id }, data: request.body as Record<string, unknown> },
+              { hooks: this.getHooks(modelName), request },
+            );
             this.send(reply, result);
           },
         );
@@ -337,9 +351,11 @@ export class RouteGenerator {
             if (!allowed) return;
 
             const { id } = request.params as { id: string };
-            const result = await this.engine.delete(modelName, {
-              where: { id },
-            });
+            const result = await this.engine.delete(
+              modelName,
+              { where: { id } },
+              { hooks: this.getHooks(modelName), request },
+            );
             this.send(reply, result);
           },
         );
