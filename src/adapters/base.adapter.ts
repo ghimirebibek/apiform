@@ -56,4 +56,8 @@ export abstract class BaseAdapter {
   hasModel(name: string): boolean {
     return this.models.some((m) => m.name.toLowerCase() === name.toLowerCase());
   }
+
+  getOmitFields(_name: string): string[] {
+    return [];
+  }
 }

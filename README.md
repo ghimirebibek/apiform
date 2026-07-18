@@ -150,21 +150,38 @@ Every endpoint returns the same consistent structure:
 
 All `GET` list endpoints support the following query parameters out of the box:
 
-| Parameter     | Type            | Description                           |
-| ------------- | --------------- | ------------------------------------- |
-| `page`        | number          | Page number (default: 1)              |
-| `limit`       | number          | Items per page (default: 10)          |
-| `searchBy`    | string          | Field name to search on               |
-| `searchValue` | string          | Value to search for                   |
-| `sortBy`      | string          | Field to sort by (default: createdAt) |
-| `sortOrder`   | `asc` or `desc` | Sort direction (default: desc)        |
-| `filters`     | JSON string     | Additional field filters              |
+| Parameter     | Type            | Description                              |
+| ------------- | --------------- | ----------------------------------------- |
+| `page`        | number          | Page number (default: 1)                  |
+| `limit`       | number          | Items per page (default: 10)               |
+| `searchBy`    | string          | Field name to search on                    |
+| `searchValue` | string          | Value to search for                        |
+| `sortBy`      | string          | Field to sort by (default: createdAt)      |
+| `sortOrder`   | `asc` or `desc` | Sort direction (default: desc)             |
+| `filters`     | JSON string     | Additional field filters (see below)       |
+| `fields`      | comma-separated | Project the response down to these fields  |
 
 **Example:**
 
 ```
 GET /api/users?page=2&limit=5&searchBy=name&searchValue=john&sortBy=createdAt&sortOrder=desc
+GET /api/users?fields=id,name,email
 ```
+
+### Filtering
+
+`filters` is sanitized before it ever reaches the database — apiform is not a passthrough for arbitrary Prisma `where` clauses. Only fields that exist as **scalar, non-relation** columns on the model may be filtered, and only a fixed set of operators is honored:
+
+`equals`, `not`, `in`, `notIn`, `lt`, `lte`, `gt`, `gte`, `contains`, `startsWith`, `endsWith`
+
+Anything else — relation fields, unknown fields, Prisma logical operators like `OR`/`AND`, unrecognized operators — is silently dropped rather than forwarded to the query engine. The same whitelist applies to `searchBy`.
+
+```
+GET /api/users?filters={"age":{"gte":18,"lte":65}}
+GET /api/users?filters={"role":{"in":["admin","editor"]}}
+```
+
+`?fields=` works the same way in reverse: it's a client-side projection applied **after** any server-side `omit` config (see below), so a client can never use `fields` to pull back a field the server has hidden.
 
 ---
 
@@ -390,6 +407,29 @@ rbac: {
 
 ---
 
+## Field Visibility
+
+By default, every field on a model is returned in API responses — including things like password hashes or internal notes. Use `omit` to permanently hide fields from every response for a model, regardless of `select`, `include`, or `fields=`:
+
+```ts
+const app = new ApiForm(prisma, {
+  models: {
+    user: {
+      omit: ["password", "internalNotes"],
+    },
+  },
+});
+```
+
+**How it works:**
+
+- Omitted fields are stripped from `findAll`, `findById`, `create`, `update`, `delete`, `restore`, and `findDeleted` responses.
+- Omitted fields are **still writable** on `create`/`update` — this is what makes `omit` useful for a field like `password`: clients can set it, but it's never echoed back.
+- Omission is enforced server-side, after the database query. A client cannot use `?fields=` or `?include=` to get an omitted field back.
+- When you `?include=` a relation, the related model's own `omit` config is applied too. If `Post` includes `author` and `User` has `omit: ["password"]`, `GET /api/posts?include=author` will never leak `author.password`.
+
+---
+
 ## TypeScript Generics
 
 All CRUD operations support TypeScript generics for fully typed responses:
@@ -515,6 +555,7 @@ new ApiForm(prismaClient, {
     [modelName]: boolean | {
       prefix?: string;
       softDelete?: boolean | string;
+      omit?: string[];         // fields always stripped from responses
       create?: RouteOptions;
       findAll?: RouteOptions;
       findById?: RouteOptions;

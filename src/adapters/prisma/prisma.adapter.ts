@@ -4,6 +4,8 @@ type PrismaClient = any;
 import { BaseAdapter } from "../base.adapter";
 import { SchemaReader } from "./schema.reader";
 import { SoftDeleteManager } from "../../core/soft-delete.manager";
+import { FieldMasker } from "../../core/field.masker";
+import { FilterBuilder } from "../../core/filter.builder";
 import type {
   FindAllOptions,
   FindOneOptions,
@@ -59,6 +61,19 @@ export class PrismaAdapter extends BaseAdapter {
     return result;
   }
 
+  override getOmitFields(model: string): string[] {
+    return this.modelConfigs[model.toLowerCase()]?.omit ?? [];
+  }
+
+  private mask<T>(model: string, data: T): T {
+    return FieldMasker.mask(
+      data,
+      model,
+      (name) => this.getModel(name),
+      (name) => this.getOmitFields(name)
+    ) as T;
+  }
+
   async findAll(
     model: string,
     options: FindAllOptions
@@ -76,9 +91,20 @@ export class PrismaAdapter extends BaseAdapter {
     } = options;
 
     const offset = (page - 1) * limit;
-    let whereClause: Record<string, unknown> = { ...where, ...filters };
 
-    if (searchBy && searchValue) {
+    const modelDef = this.getModel(model);
+    const allModelNames = new Set(this.models.map((m) => m.name.toLowerCase()));
+    const safeFilters = modelDef
+      ? FilterBuilder.build(filters, modelDef, allModelNames)
+      : {};
+
+    let whereClause: Record<string, unknown> = { ...where, ...safeFilters };
+
+    const searchAllowed =
+      searchBy &&
+      modelDef &&
+      FilterBuilder.isFilterableField(searchBy, modelDef, allModelNames);
+    if (searchAllowed && searchValue) {
       whereClause[searchBy] = { contains: searchValue, mode: "insensitive" };
     }
 
@@ -104,7 +130,7 @@ export class PrismaAdapter extends BaseAdapter {
 
     const totalPages = Math.ceil(total / limit);
     return {
-      data,
+      data: this.mask(model, data),
       meta: {
         total,
         page,
@@ -135,7 +161,7 @@ export class PrismaAdapter extends BaseAdapter {
       where: whereClause,
       ...(options.include ? { include: options.include } : {}),
     });
-    return { data };
+    return { data: this.mask(model, data) };
   }
 
   async findById(
@@ -148,7 +174,7 @@ export class PrismaAdapter extends BaseAdapter {
     const data = await delegate.findUnique({
       where: { id: parsedId },
     });
-    return { data };
+    return { data: this.mask(model, data) };
   }
 
   async create(
@@ -157,7 +183,7 @@ export class PrismaAdapter extends BaseAdapter {
   ): Promise<CrudResult<unknown>> {
     const delegate = this.getDelegate(model);
     const data = await delegate.create({ data: options.data });
-    return { data };
+    return { data: this.mask(model, data) };
   }
 
   async update(
@@ -172,7 +198,7 @@ export class PrismaAdapter extends BaseAdapter {
       ])
     );
     const data = await delegate.update({ where, data: options.data });
-    return { data };
+    return { data: this.mask(model, data) };
   }
 
   async delete(
@@ -195,11 +221,11 @@ export class PrismaAdapter extends BaseAdapter {
         where,
         data: SoftDeleteManager.softDeleteData(deletedAtField),
       });
-      return { data };
+      return { data: this.mask(model, data) };
     }
 
     const data = await delegate.delete({ where });
-    return { data };
+    return { data: this.mask(model, data) };
   }
 
   async restore(
@@ -218,7 +244,7 @@ export class PrismaAdapter extends BaseAdapter {
       where: { id: parsedId },
       data: SoftDeleteManager.restoreData(deletedAtField),
     });
-    return { data };
+    return { data: this.mask(model, data) };
   }
 
   async findDeleted(
@@ -252,7 +278,7 @@ export class PrismaAdapter extends BaseAdapter {
 
     const totalPages = Math.ceil(total / limit);
     return {
-      data,
+      data: this.mask(model, data),
       meta: {
         total,
         page,

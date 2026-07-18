@@ -11,11 +11,13 @@ export interface FindAllOptions {
   sortOrder?: "asc" | "desc";
   filters?: Record<string, unknown>;
   include?: Record<string, boolean>;
+  fields?: string[];
 }
 
 export interface FindOneOptions {
   where: Record<string, unknown>;
   include?: Record<string, boolean>;
+  fields?: string[];
 }
 
 export interface CreateOptions<T = Record<string, unknown>> {

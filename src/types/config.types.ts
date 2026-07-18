@@ -32,6 +32,7 @@ export interface ModelRouteConfig {
   findDeleted?: RouteOptions;
   prefix?: string;
   softDelete?: boolean | string;
+  omit?: string[];
 }
 
 export interface ApiFormConfig {

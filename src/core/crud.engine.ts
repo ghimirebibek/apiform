@@ -11,6 +11,7 @@ import type {
   DeleteOptions,
 } from "../types/crud.types";
 import { Validator } from "./validator";
+import { FieldMasker } from "./field.masker";
 
 export class CrudEngine {
   private adapter: BaseAdapter;
@@ -27,9 +28,10 @@ export class CrudEngine {
       const result = await this.adapter.findAll(model, options);
       const page = options.page ?? 1;
       const limit = options.limit ?? 10;
+      const data = FieldMasker.select(result.data ?? [], options.fields) as T[];
 
       return ResponseFormatter.paginate<T>(
-        (result.data ?? []) as T[],
+        data,
         model,
         page,
         limit,
@@ -66,7 +68,8 @@ export class CrudEngine {
   async findById<T = unknown>(
     model: string,
     id: string | number,
-    include?: Record<string, boolean>
+    include?: Record<string, boolean>,
+    fields?: string[]
   ): Promise<ApiResponse<T>> {
     try {
       const result = await this.adapter.findById(model, id, include);
@@ -79,7 +82,7 @@ export class CrudEngine {
       }
 
       return ResponseFormatter.success<T>(
-        result.data as T,
+        FieldMasker.select(result.data, fields) as T,
         ResponseFormatter.formatMessage("findById", model)
       );
     } catch (error) {

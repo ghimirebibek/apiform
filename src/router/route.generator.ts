@@ -110,6 +110,26 @@ export class RouteGenerator {
                 )
               : undefined;
 
+            const fieldsParam = query.fields
+              ? query.fields.split(",").map((f: string) => f.trim())
+              : undefined;
+
+            let filters: Record<string, unknown> = {};
+            if (query.filters) {
+              try {
+                filters = JSON.parse(query.filters);
+              } catch {
+                this.send(reply, {
+                  success: false,
+                  message: "INVALID_FILTERS",
+                  data: null,
+                  meta: null,
+                  error: { code: "VALIDATION_ERROR" },
+                });
+                return;
+              }
+            }
+
             const result = await this.engine.findAll(modelName, {
               page: query.page ? parseInt(query.page) : 1,
               limit: query.limit ? parseInt(query.limit) : 10,
@@ -117,8 +137,9 @@ export class RouteGenerator {
               searchValue: query.searchValue,
               sortBy: query.sortBy,
               sortOrder: query.sortOrder as "asc" | "desc" | undefined,
-              filters: query.filters ? JSON.parse(query.filters) : {},
+              filters,
               include: includeParam,
+              fields: fieldsParam,
             });
             this.send(reply, result);
           },
@@ -206,11 +227,15 @@ export class RouteGenerator {
                   query.include.split(",").map((r: string) => [r.trim(), true]),
                 )
               : undefined;
+            const fieldsParam = query.fields
+              ? query.fields.split(",").map((f: string) => f.trim())
+              : undefined;
 
             const result = await this.engine.findById(
               modelName,
               id,
               includeParam,
+              fieldsParam,
             );
             this.send(reply, result);
           },
