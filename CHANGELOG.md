@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.5.0] - 2026-07-18
+
+### Added
+
+- Field visibility — `omit: string[]` per-model config permanently strips sensitive fields (e.g. passwords) from every response, including included relations; fields stay writable on create/update
+- Whitelisted query filters — `filters=` and `searchBy=` are now validated against real scalar fields and a fixed operator set (`equals`, `not`, `in`, `notIn`, `lt`, `lte`, `gt`, `gte`, `contains`, `startsWith`, `endsWith`) instead of being merged straight into the Prisma `where` clause
+- `?fields=` query parameter for response field projection
+- Lifecycle hooks — `beforeCreate`, `afterCreate`, `beforeUpdate`, `afterUpdate`, `beforeDelete`, `afterDelete`, `beforeFindAll`, `afterFindAll`, `beforeFindById`, `afterFindById` per model via `hooks` config
+- OpenAPI / Swagger UI generation — opt-in via `openapi: { enabled: true }`, served at `/docs` (raw spec at `/docs/json`)
+- Enum support in Prisma schema parsing — enum fields are now validated against their real members instead of accepting any value
+
+### Fixed
+
+- `findById`/`update`/`delete`/`restore` now resolve the model's actual `@id` field name and type instead of assuming a field named `id` and guessing numeric-vs-string coercion from the value
+- `GET /:id` now honors `?include=`, which was previously silently ignored
+- `restore`/`findDeleted` routes are now correctly opt-in (disabled by default) as already documented — a config bug previously registered them regardless of settings
+- Writable-field exclusion for create/update no longer hardcodes literal `createdAt`/`updatedAt`/`deletedAt` field names — now derived from schema attributes and the resolved (possibly renamed) soft-delete field
+- The writable-field whitelist is now actually applied to what gets persisted, not just used for validation
+- Validation errors now correctly return `400 VALIDATION_ERROR` instead of `500 INTERNAL_ERROR` (stale Zod v3 error-shape detection)
+- Soft-deleted records are now correctly excluded from `GET /:id`, matching documented behavior
+- Omitted fields can no longer be probed indirectly via `filters=`/`searchBy=`
+
 ## [0.4.0] - 2026-03-06
 
 ### Added
