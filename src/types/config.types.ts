@@ -37,6 +37,16 @@ export interface ModelRouteConfig {
   hooks?: ModelHooks;
 }
 
+export interface OpenApiConfig {
+  enabled?: boolean;
+  path?: string; // Swagger UI mount path, default "/docs"
+  info?: {
+    title?: string;
+    version?: string;
+    description?: string;
+  };
+}
+
 export interface ApiFormConfig {
   models?: Record<string, ModelRouteConfig | boolean>;
   globalPrefix?: string;
@@ -44,4 +54,5 @@ export interface ApiFormConfig {
   schemaPath?: string;
   rbac?: RbacConfig;
   rateLimit?: RateLimitConfig;
+  openapi?: OpenApiConfig;
 }

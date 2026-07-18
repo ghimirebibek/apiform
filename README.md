@@ -29,6 +29,9 @@ Every route returns a consistent, predictable response shape — making your API
 - **TypeScript generics** — fully typed responses out of the box
 - **Role-Based Access Control (RBAC)** — global and per-route role protection
 - **Rate limiting** — global and per-route rate limiting out of the box
+- **Field visibility** — permanently hide sensitive fields (e.g. passwords) from every response
+- **Lifecycle hooks** — inject logic into generated routes without reimplementing them
+- **OpenAPI / Swagger UI** — auto-generated API docs from your schema, opt-in
 - **Fully customizable** — disable routes, add middleware, change prefixes per model
 - **Custom routes** — add your own routes on top of generated ones
 - **TypeScript first** — full type safety and intellisense out of the box
@@ -575,6 +578,39 @@ Rate limit headers are automatically included in every response:
 
 ---
 
+## OpenAPI / Swagger UI
+
+Generate an OpenAPI 3.0 spec and browsable Swagger UI directly from your Prisma schema and apiform config — disabled by default, opt in with `openapi.enabled`:
+
+```ts
+const app = new ApiForm(prisma, {
+  openapi: {
+    enabled: true,
+    path: "/docs", // Swagger UI, default "/docs"
+    info: {
+      title: "My API",
+      version: "1.0.0",
+      description: "Auto-generated from the Prisma schema",
+    },
+  },
+  models: { user: true },
+});
+
+app.start(3000);
+// Swagger UI:    http://localhost:3000/docs
+// Raw OpenAPI:   http://localhost:3000/docs/json
+```
+
+**What's documented, and how accurately:**
+
+- One path per generated route, grouped by model, covering only the routes actually enabled in your config (a model disabled with `false`, or `restore`/`findDeleted` left at their default-disabled state, simply won't appear).
+- Request bodies for `create`/`update` reflect the exact same writable-field set the request is validated against at runtime (same PK/timestamp/soft-delete exclusions) — the docs can't drift from what's actually enforced, because both are computed from the same field list.
+- Enum fields are documented as a real OpenAPI enum with your enum's actual members, not a free-form string.
+- Response schemas respect `omit` — a field hidden from every response is hidden from the documented response too.
+- The document is generated once in "static" mode and is completely decoupled from Fastify's own route-schema system — no `schema` is ever attached to a live route, so enabling this can't change request validation or response serialization for your actual API. It's documentation only.
+
+---
+
 ## Configuration Reference
 
 ```ts
@@ -589,6 +625,11 @@ new ApiForm(prismaClient, {
   rbac?: {
     rolesPath?: string;           // default: "user.roles"
     globalRoles?: string[];       // roles required for all routes
+  };
+  openapi?: {
+    enabled?: boolean;            // default: false
+    path?: string;                // Swagger UI path, default "/docs"
+    info?: { title?: string; version?: string; description?: string };
   };
   models?: {
     [modelName]: boolean | {

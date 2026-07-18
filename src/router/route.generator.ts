@@ -3,10 +3,11 @@ import { CrudEngine } from "../core/crud.engine";
 import { RouteConfig } from "./route.config";
 import { MiddlewareBinder } from "./middleware.binder";
 import type { PrismaAdapter } from "../adapters/prisma/prisma.adapter";
-import type { ApiFormConfig, RouteOptions } from "../types/config.types";
+import type { ApiFormConfig, OpenApiConfig, RouteOptions } from "../types/config.types";
 import type { ModelHooks } from "../types/crud.types";
 import { ErrorHandler } from "../core/error.handler";
 import { RbacManager } from "../core/rbac.manager";
+import { OpenApiBuilder } from "./openapi.builder";
 
 export class RouteGenerator {
   private engine: CrudEngine;
@@ -31,6 +32,10 @@ export class RouteGenerator {
       }
     }
     this.adapter.setModelConfigs(modelConfigs);
+  }
+
+  buildOpenApiDoc(info?: OpenApiConfig["info"]): Record<string, unknown> {
+    return OpenApiBuilder.build(this.adapter, this.config, info);
   }
 
   private send(reply: FastifyReply, result: any): void {

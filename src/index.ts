@@ -1,5 +1,7 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import fastifyRateLimit from "@fastify/rate-limit";
+import fastifySwagger from "@fastify/swagger";
+import fastifySwaggerUi from "@fastify/swagger-ui";
 import { PrismaAdapter } from "./adapters/prisma/prisma.adapter";
 import { RouteGenerator } from "./router/route.generator";
 import type { ApiFormConfig, RateLimitConfig } from "./types/config.types";
@@ -50,6 +52,21 @@ export class ApiForm {
       });
     }
 
+    // Register OpenAPI/Swagger UI in "static" mode: the document is built
+    // once from the schema/config, independent of Fastify's own route
+    // schema system. Route handlers never get a `schema` attached, so this
+    // can't change request validation or response serialization behavior.
+    if (this.config.openapi?.enabled) {
+      const document = this.generator.buildOpenApiDoc(this.config.openapi.info);
+      await this.fastify.register(fastifySwagger, {
+        mode: "static",
+        specification: { document: document as any },
+      });
+      await this.fastify.register(fastifySwaggerUi, {
+        routePrefix: this.config.openapi.path ?? "/docs",
+      });
+    }
+
     this.generator.applyModelConfigs();
     await this.generator.register(this.fastify);
 
@@ -78,12 +95,14 @@ export { ResponseFormatter } from "./core/response.formatter";
 export { ErrorHandler } from "./core/error.handler";
 export { SoftDeleteManager } from "./core/soft-delete.manager";
 export { RbacManager } from "./core/rbac.manager";
+export { OpenApiBuilder } from "./router/openapi.builder";
 export type {
   ApiFormConfig,
   ModelRouteConfig,
   RouteOptions,
   RateLimitConfig,
   RbacConfig,
+  OpenApiConfig,
 } from "./types/config.types";
 export type {
   ApiResponse,

@@ -14,6 +14,7 @@ import type {
 } from "../types/crud.types";
 import { Validator } from "./validator";
 import { FieldMasker } from "./field.masker";
+import { getWritableFields } from "./writable-fields";
 import type { ModelDefinition } from "../types/adapter.types";
 
 export class CrudEngine {
@@ -23,19 +24,8 @@ export class CrudEngine {
     this.adapter = adapter;
   }
 
-  // Fields a client may set on create/update: excludes the PK, any
-  // @updatedAt field, any field auto-defaulted via @default(now()) (e.g.
-  // createdAt — regardless of what it's actually named), and the model's
-  // resolved soft-delete field (which itself may be renamed via config).
   private getWritableFields(model: string, modelDef: ModelDefinition) {
-    const softDeleteField = this.adapter.getSoftDeleteField(model);
-    return modelDef.fields.filter((f) => {
-      if (f.isId) return false;
-      if (f.isUpdatedAt) return false;
-      if (f.default === "now()") return false;
-      if (softDeleteField && f.name === softDeleteField) return false;
-      return true;
-    });
+    return getWritableFields(modelDef, this.adapter.getSoftDeleteField(model));
   }
 
   private buildHookContext(model: string, runtime?: HookRuntime): HookContext {
